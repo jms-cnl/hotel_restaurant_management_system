@@ -1,6 +1,6 @@
 import { supabase } from "../config/supabase.js";
 
-export const getReservations = async (filters: { status?: string | undefined; type?: string | undefined; combined_booking_id?: string | undefined }) => {
+export const getReservations = async (filters: { status?: string | undefined; type?: string | undefined; combined_booking_id?: string | undefined; user_id?: string | undefined }) => {
     let query = supabase
         .from("reservation")
         .select("*, user(*), room(*), restaurant_table(*), combined_booking(*)");
@@ -15,6 +15,10 @@ export const getReservations = async (filters: { status?: string | undefined; ty
 
     if (filters.combined_booking_id) {
         query = query.eq("combined_booking_id", filters.combined_booking_id);
+    }
+
+    if (filters.user_id) {
+        query = query.eq("user_id", filters.user_id);
     }
 
     const { data, error } = await query;

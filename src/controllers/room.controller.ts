@@ -1,5 +1,11 @@
 import type { Request, Response } from "express";
-import { createRoom, deleteRoom, getRoomById, getRooms, updateRoom } from "../services/room.service.js";
+import { 
+    getRooms,  
+    getRoomById,
+    createRoom,
+    updateRoom,
+    deleteRoom  
+} from "../services/room.service.js";
 
 export const getRoomsController = async (req: Request, res: Response) => {
     try {

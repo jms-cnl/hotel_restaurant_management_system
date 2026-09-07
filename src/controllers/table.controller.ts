@@ -1,5 +1,9 @@
 import type { Request, Response } from "express";
-import { createTable, deleteTable, getTableById, getTables, updateTable } from "../services/table.service.js";
+import {  getTables, 
+    getTableById, 
+    createTable, 
+    updateTable, 
+    deleteTable} from "../services/table.service.js";
 
 export const getTablesController = async (req: Request, res: Response) => {
     try {

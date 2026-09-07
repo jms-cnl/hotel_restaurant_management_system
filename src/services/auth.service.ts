@@ -7,9 +7,8 @@ export const registerUser = async (payload: {
     first_name: string;
     last_name: string;
     phone?: string;
-    role_id: number;
 }) => {
-    const { email, password, first_name, last_name, phone, role_id } = payload;
+    const { email, password, first_name, last_name, phone } = payload;
     const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password
@@ -23,11 +22,21 @@ export const registerUser = async (payload: {
         return authData;
     }
 
+    const { data: customerRole, error: roleError } = await supabase
+        .from("role")
+        .select("role_id")
+        .eq("role_name", "Customer")
+        .single();
+
+    if (roleError || !customerRole) {
+        throw roleError ?? new Error("Customer role is not configured");
+    }
+
     const { data: profile, error: profileError } = await supabase
         .from("user")
         .insert({
             user_id: authData.user.id,
-            role_id,
+            role_id: customerRole.role_id,
             first_name,
             last_name,
             email,

@@ -1,18 +1,20 @@
 import { Router } from "express";
 import {
-    createRoomController,
-    deleteRoomController,
-    getRoomByIdController,
     getRoomsController,
-    updateRoomController
+    getRoomByIdController,
+    createRoomController,
+    updateRoomController,
+    deleteRoomController
 } from "../controllers/room.controller.js";
+import { authenticate, requireRole } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
+router.use(authenticate);
 router.get("/", getRoomsController);
 router.get("/:id", getRoomByIdController);
-router.post("/", createRoomController);
-router.put("/:id", updateRoomController);
-router.delete("/:id", deleteRoomController);
+router.post("/", requireRole("Admin", "Staff"), createRoomController);
+router.put("/:id", requireRole("Admin", "Staff"), updateRoomController);
+router.delete("/:id", requireRole("Admin", "Staff"), deleteRoomController);
 
 export default router;

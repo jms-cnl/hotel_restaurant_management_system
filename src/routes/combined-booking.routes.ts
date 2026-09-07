@@ -9,16 +9,18 @@ import {
     getCombinedBookingsController,
     updateCombinedBookingController
 } from "../controllers/combined-booking.controller.js";
+import { authenticate, requireOwnedRecord, requireRole, requireSelfPayload, scopeToAuthenticatedUser } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
-router.get("/", getCombinedBookingsController);
-router.post("/", createCombinedBookingController);
-router.post("/hotel-restaurant", createHotelRestaurantCombinedBookingController);
-router.get("/:id/reservations", getCombinedBookingReservationsController);
-router.patch("/:id/status", changeCombinedBookingStatusController);
-router.get("/:id", getCombinedBookingByIdController);
-router.put("/:id", updateCombinedBookingController);
-router.delete("/:id", deleteCombinedBookingController);
+router.use(authenticate);
+router.get("/", scopeToAuthenticatedUser, getCombinedBookingsController);
+router.post("/", requireSelfPayload, createCombinedBookingController);
+router.post("/hotel-restaurant", requireSelfPayload, createHotelRestaurantCombinedBookingController);
+router.get("/:id/reservations", requireOwnedRecord("combined_booking"), getCombinedBookingReservationsController);
+router.patch("/:id/status", requireRole("Admin", "Staff"), changeCombinedBookingStatusController);
+router.get("/:id", requireOwnedRecord("combined_booking"), getCombinedBookingByIdController);
+router.put("/:id", requireOwnedRecord("combined_booking"), requireSelfPayload, updateCombinedBookingController);
+router.delete("/:id", requireOwnedRecord("combined_booking"), deleteCombinedBookingController);
 
 export default router;

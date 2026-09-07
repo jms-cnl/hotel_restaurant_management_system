@@ -1,12 +1,12 @@
 import type { Request, Response } from "express";
 import {
-    changeReservationStatus,
-    createReservation,
-    deleteReservation,
-    getReservationById,
-    getReservationHistory,
     getReservations,
-    updateReservation
+    getReservationById,
+    createReservation,
+    updateReservation,
+    deleteReservation,
+    changeReservationStatus,
+    getReservationHistory
 } from "../services/reservation.service.js";
 
 export const getReservationsController = async (req: Request, res: Response) => {
@@ -14,7 +14,8 @@ export const getReservationsController = async (req: Request, res: Response) => 
         const reservations = await getReservations({
             status: req.query.status?.toString(),
             type: req.query.type?.toString(),
-            combined_booking_id: req.query.combined_booking_id?.toString()
+            combined_booking_id: req.query.combined_booking_id?.toString(),
+            user_id: req.query.user_id?.toString()
         });
 
         res.json(reservations);
