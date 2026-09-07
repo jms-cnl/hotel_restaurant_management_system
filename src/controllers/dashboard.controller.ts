@@ -1,9 +1,9 @@
 import type { Request, Response } from "express";
 import { getDashboardStats } from "../services/dashboard.service.js";
 
-export const getDashboardController = async (_req: Request, res: Response) => {
+export const getDashboardController = async (req: Request, res: Response) => {
     try {
-        const dashboard = await getDashboardStats();
+        const dashboard = await getDashboardStats(req.auth?.user.id ?? "");
 
         res.json(dashboard);
     } catch (error) {

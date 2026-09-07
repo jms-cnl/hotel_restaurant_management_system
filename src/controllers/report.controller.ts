@@ -1,50 +1,49 @@
 import type { Request, Response } from "express";
-import { getOccupancyReport, getReservationReport, getRevenueReport } from "../services/report.service.js";
+import { getOccupancyReport, getReservationReport, getRevenueReport, getTableReport, parseReportFilters, ReportError } from "../services/report.service.js";
+
+const handleReportError = (res: Response, error: unknown, message: string) => {
+    if (error instanceof ReportError) {
+        res.status(error.statusCode).json({ message: error.message });
+        return;
+    }
+    console.error(error);
+    res.status(500).json({ message });
+};
 
 export const getReservationReportController = async (req: Request, res: Response) => {
     try {
-        const report = await getReservationReport({
-            status: req.query.status?.toString(),
-            type: req.query.type?.toString()
-        });
+        const report = await getReservationReport(parseReportFilters(req.query as Record<string, unknown>));
 
         res.json(report);
     } catch (error) {
-        console.error(error);
-
-        res.status(500).json({
-            message: "Failed to retrieve reservation report",
-            error: error
-        });
+        handleReportError(res, error, "Failed to retrieve reservation report");
     }
 };
 
-export const getRevenueReportController = async (_req: Request, res: Response) => {
+export const getRevenueReportController = async (req: Request, res: Response) => {
     try {
-        const report = await getRevenueReport();
+        const report = await getRevenueReport(parseReportFilters(req.query as Record<string, unknown>));
 
         res.json(report);
     } catch (error) {
-        console.error(error);
-
-        res.status(500).json({
-            message: "Failed to retrieve revenue report",
-            error: error
-        });
+        handleReportError(res, error, "Failed to retrieve revenue report");
     }
 };
 
-export const getOccupancyReportController = async (_req: Request, res: Response) => {
+export const getOccupancyReportController = async (req: Request, res: Response) => {
     try {
-        const report = await getOccupancyReport();
+        const report = await getOccupancyReport(parseReportFilters(req.query as Record<string, unknown>));
 
         res.json(report);
     } catch (error) {
-        console.error(error);
+        handleReportError(res, error, "Failed to retrieve occupancy report");
+    }
+};
 
-        res.status(500).json({
-            message: "Failed to retrieve occupancy report",
-            error: error
-        });
+export const getTableReportController = async (req: Request, res: Response) => {
+    try {
+        res.json(await getTableReport(parseReportFilters(req.query as Record<string, unknown>)));
+    } catch (error) {
+        handleReportError(res, error, "Failed to retrieve table report");
     }
 };

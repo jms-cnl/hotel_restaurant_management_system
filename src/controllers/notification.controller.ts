@@ -1,5 +1,14 @@
 import type { Request, Response } from "express";
-import { getNotifications, markNotificationAsRead } from "../services/notification.service.js";
+import { getNotifications, markNotificationAsRead, NotificationError } from "../services/notification.service.js";
+
+const handleNotificationError = (res: Response, error: unknown, message: string) => {
+    if (error instanceof NotificationError) {
+        res.status(error.statusCode).json({ message: error.message });
+        return;
+    }
+    console.error(error);
+    res.status(500).json({ message });
+};
 
 export const getNotificationsController = async (req: Request, res: Response) => {
     try {
@@ -7,12 +16,7 @@ export const getNotificationsController = async (req: Request, res: Response) =>
 
         res.json(notifications);
     } catch (error) {
-        console.error(error);
-
-        res.status(401).json({
-            message: "Failed to retrieve notifications",
-            error: error
-        });
+        handleNotificationError(res, error, "Failed to retrieve notifications");
     }
 };
 
@@ -22,11 +26,6 @@ export const markNotificationAsReadController = async (req: Request, res: Respon
 
         res.json(notification);
     } catch (error) {
-        console.error(error);
-
-        res.status(401).json({
-            message: "Failed to mark notification as read",
-            error: error
-        });
+        handleNotificationError(res, error, "Failed to mark notification as read");
     }
 };

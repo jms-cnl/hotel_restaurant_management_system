@@ -1,4 +1,5 @@
 import { supabase } from "../config/supabase.js";
+import { deleteMediaForEntity } from "./media.service.js";
 
 export const getRooms = async (filters: { status?: string | undefined }) => {
     let query = supabase
@@ -79,6 +80,7 @@ export const updateRoom = async (
 };
 
 export const deleteRoom = async (id: number) => {
+    await deleteMediaForEntity("room", id);
     const { error } = await supabase
         .from("room")
         .delete()

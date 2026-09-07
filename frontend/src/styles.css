@@ -34,5 +34,18 @@ th { background: #e5e7eb; }
 .stat { display: flex; flex-direction: column; gap: .3rem; padding: 1rem; background: #fff; border: 1px solid #d1d5db; }
 .stat strong { font-size: 1.6rem; }
 .detail, .report-block { margin-top: 1rem; padding: 1rem; background: #fff; border: 1px solid #d1d5db; }
+.password-form { margin-top: 1.2rem; }
+.password-guidance { font-size: .9rem; font-weight: 400; }
+.password-guidance ul { margin: .4rem 0; padding-left: 1.2rem; }
+.media-manager { margin-top: 1rem; padding: 1rem; background: #fff; border: 1px solid #d1d5db; }
+.media-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: .8rem; }
+.media-item { display: flex; flex-direction: column; gap: .5rem; padding: .6rem; border: 1px solid #d1d5db; }
+.media-item img { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: #f3f4f6; }
+.media-item span { display: block; color: #4b5563; font-size: .85rem; }
+.media-actions { display: flex; flex-direction: column; gap: .4rem; }
+.media-upload { display: flex; gap: .7rem; align-items: end; margin-top: 1rem; }
+.media-upload label { flex: 1; }
+.requirement-missing { color: #991b1b; }
+.requirement-met { color: #166534; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 640px) { .topbar { flex-wrap: wrap; } .topbar .brand { width: 100%; } .content { padding: .8rem; } }

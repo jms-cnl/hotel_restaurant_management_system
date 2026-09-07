@@ -5,6 +5,7 @@ import combinedBookingRouter from "./routes/combined-booking.routes.js";
 import dashboardRouter from "./routes/dashboard.routes.js";
 import hotelRouter from "./routes/hotel.routes.js";
 import notificationRouter from "./routes/notification.routes.js";
+import mediaRouter from "./routes/media.routes.js";
 import reportRouter from "./routes/report.routes.js";
 import reservationRouter from "./routes/reservation.routes.js";
 import restaurantRouter from "./routes/restaurant.routes.js";
@@ -26,6 +27,7 @@ app.use("/api/tables", tableRouter);
 app.use("/api/reservations", reservationRouter);
 app.use("/api/combined-bookings", combinedBookingRouter);
 app.use("/api/notifications", notificationRouter);
+app.use("/api/media", mediaRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/reports", reportRouter);
 

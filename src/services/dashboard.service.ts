@@ -18,7 +18,7 @@ const getCount = async (table: string, filters: Record<string, string> = {}) => 
     return count ?? 0;
 };
 
-export const getDashboardStats = async () => {
+export const getDashboardStats = async (userId: string) => {
     const [
         hotels,
         restaurants,
@@ -47,8 +47,8 @@ export const getDashboardStats = async () => {
         getCount("reservation", { status: "Cancelled" }),
         getCount("combined_booking"),
         getCount("combined_booking", { status: "Completed" }),
-        getCount("notification"),
-        getCount("notification", { is_read: "false" })
+        getCount("notification", { user_id: userId }),
+        getCount("notification", { user_id: userId, is_read: "false" })
     ]);
 
     return {

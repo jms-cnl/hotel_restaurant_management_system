@@ -5,6 +5,7 @@ import {
     validateReservation,
     type ReservationInput
 } from "./reservation.service.js";
+import { createReservationNotification } from "./notification.service.js";
 
 type CombinedReservationInput = Omit<ReservationInput, "user_id"> & { user_id?: string };
 
@@ -94,6 +95,12 @@ export const createCombinedBooking = async (payload: {
         throw historyError;
     }
 
+    await Promise.all(data.map((reservation) => createReservationNotification({
+        userId: reservation.user_id,
+        reservationId: reservation.reservation_id,
+        type: "RESERVATION_CREATED"
+    })));
+
     return { ...combinedBooking, reservations: data };
 };
 
@@ -132,7 +139,7 @@ export const changeCombinedBookingStatus = async (id: number, payload: { status:
     if (currentError || !current) throw currentError ?? new ReservationError("Combined booking not found", 404);
     if (!isSupportedStatusTransition(current.status, payload.status)) throw new ReservationError(`Invalid combined booking status transition: ${current.status} to ${payload.status}`);
 
-    const { data: children, error: childrenError } = await supabase.from("reservation").select("reservation_id, status").eq("combined_booking_id", id);
+    const { data: children, error: childrenError } = await supabase.from("reservation").select("reservation_id, user_id, status").eq("combined_booking_id", id);
     if (childrenError) throw childrenError;
     for (const child of children ?? []) {
         if (!isSupportedStatusTransition(child.status, payload.status)) throw new ReservationError(`Child reservation cannot transition from ${child.status} to ${payload.status}`);
@@ -152,6 +159,17 @@ export const changeCombinedBookingStatus = async (id: number, payload: { status:
             remarks: payload.remarks ?? "Status changed through combined booking"
         })));
         if (historyError) throw historyError;
+        const notificationType = {
+            Confirmed: "RESERVATION_CONFIRMED",
+            Rejected: "RESERVATION_REJECTED",
+            Cancelled: "RESERVATION_CANCELLED",
+            Completed: "RESERVATION_COMPLETED"
+        } as const;
+        await Promise.all(children.map((child) => createReservationNotification({
+            userId: child.user_id,
+            reservationId: child.reservation_id,
+            type: notificationType[payload.status as keyof typeof notificationType]
+        })));
     }
 
     return data;

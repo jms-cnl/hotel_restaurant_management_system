@@ -1,4 +1,5 @@
 import { supabase } from "../config/supabase.js";
+import { createReservationNotification } from "./notification.service.js";
 
 const BLOCKING_STATUSES = ["Pending", "Confirmed"];
 
@@ -127,6 +128,7 @@ export const createReservation = async (reservation: ReservationInput, changedBy
         await supabase.from("reservation").delete().eq("reservation_id", data.reservation_id);
         throw historyError;
     }
+    await createReservationNotification({ userId: data.user_id, reservationId: data.reservation_id, type: "RESERVATION_CREATED" });
     return data;
 };
 
@@ -153,6 +155,17 @@ export const changeReservationStatus = async (id: number, payload: { status: str
     if (error) throw error;
     const { error: historyError } = await supabase.from("reservation_status_history").insert({ reservation_id: id, changed_by: changedBy, status: payload.status, remarks: payload.remarks });
     if (historyError) throw historyError;
+    const notificationType = {
+        Confirmed: "RESERVATION_CONFIRMED",
+        Rejected: "RESERVATION_REJECTED",
+        Cancelled: "RESERVATION_CANCELLED",
+        Completed: "RESERVATION_COMPLETED"
+    } as const;
+    await createReservationNotification({
+        userId: data.user_id,
+        reservationId: data.reservation_id,
+        type: notificationType[payload.status as keyof typeof notificationType]
+    });
     return data;
 };
 

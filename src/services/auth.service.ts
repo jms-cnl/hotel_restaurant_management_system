@@ -1,5 +1,6 @@
 import type { Request } from "express";
 import { getBearerToken, getRequestSupabase, supabase } from "../config/supabase.js";
+import { assertPasswordPolicy } from "./password-policy.js";
 
 export const registerUser = async (payload: {
     email: string;
@@ -9,9 +10,18 @@ export const registerUser = async (payload: {
     phone?: string;
 }) => {
     const { email, password, first_name, last_name, phone } = payload;
+    assertPasswordPolicy(password);
+
     const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
-        password
+        password,
+        options: {
+            data: {
+                first_name,
+                last_name,
+                phone
+            }
+        }
     });
 
     if (authError) {
@@ -19,40 +29,12 @@ export const registerUser = async (payload: {
     }
 
     if (!authData.user) {
-        return authData;
-    }
-
-    const { data: customerRole, error: roleError } = await supabase
-        .from("role")
-        .select("role_id")
-        .eq("role_name", "Customer")
-        .single();
-
-    if (roleError || !customerRole) {
-        throw roleError ?? new Error("Customer role is not configured");
-    }
-
-    const { data: profile, error: profileError } = await supabase
-        .from("user")
-        .insert({
-            user_id: authData.user.id,
-            role_id: customerRole.role_id,
-            first_name,
-            last_name,
-            email,
-            phone
-        })
-        .select()
-        .single();
-
-    if (profileError) {
-        throw profileError;
+        throw new Error("User registration failed");
     }
 
     return {
         user: authData.user,
-        session: authData.session,
-        profile
+        session: authData.session
     };
 };
 
@@ -64,6 +46,41 @@ export const loginUser = async (payload: { email: string; password: string }) =>
     }
 
     return data;
+};
+
+export const requestPasswordReset = async (email: string) => {
+    if (!email?.trim()) throw new Error("Email is required");
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: process.env.FRONTEND_RESET_REDIRECT_URL ?? "http://localhost:5173/reset-password"
+    });
+
+    if (error) throw new Error("Unable to request password reset");
+};
+
+export const changePassword = async (req: Request, currentPassword: string, newPassword: string) => {
+    assertPasswordPolicy(newPassword);
+    if (currentPassword === newPassword) throw new Error("New password must be different from the current password");
+
+    const client = getRequestSupabase(req);
+    const { data: authData, error: authError } = await client.auth.getUser();
+    if (authError || !authData.user.email) throw new Error("Authenticated user could not be identified");
+
+    const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: authData.user.email,
+        password: currentPassword
+    });
+    if (verifyError) throw new Error("Current password is incorrect");
+
+    const { error: updateError } = await client.auth.updateUser({ password: newPassword });
+    if (updateError) throw new Error("Failed to change password");
+};
+
+export const resetPassword = async (req: Request, newPassword: string) => {
+    assertPasswordPolicy(newPassword);
+    const client = getRequestSupabase(req);
+    const { error } = await client.auth.updateUser({ password: newPassword });
+    if (error) throw new Error("Reset session is invalid or expired");
 };
 
 export const logoutUser = async (req: Request) => {
