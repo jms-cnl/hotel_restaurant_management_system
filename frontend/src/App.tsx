@@ -1,0 +1,107 @@
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "./api";
+import { useAuth } from "./auth";
+import type { CombinedBooking, Hotel, Reservation, ReservationHistory, Restaurant, RestaurantTable, Room, User } from "./types";
+
+const role = (user: User | null) => user?.role?.role_name ?? "Customer";
+const isManager = (user: User | null) => ["Admin", "Staff"].includes(role(user));
+
+function Protected({ children }: { children: ReactNode }) {
+    const { user, loading } = useAuth();
+    if (loading) return <main className="center">Loading session...</main>;
+    return user ? <>{children}</> : <Navigate to="/login" replace />;
+}
+
+function AppLayout({ children }: { children: ReactNode }) {
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
+    const links = [
+        ["Dashboard", "/dashboard"], ["Hotels", "/hotels"], ["Restaurants", "/restaurants"], ["Rooms", "/rooms"], ["Tables", "/tables"],
+        ["Reservations", "/reservations"], ["Combined bookings", "/combined-bookings"], ["Reports", "/reports"], ["Profile", "/profile"]
+    ].filter(([label]) => label !== "Reports" || isManager(user));
+    return <div className="app-shell">
+        <header className="topbar"><Link className="brand" to="/dashboard">HRM reservations</Link><span>{user?.first_name} {user?.last_name} ({role(user)})</span><button onClick={async () => { await logout(); navigate("/login"); }}>Log out</button></header>
+        <nav className="nav">{links.map(([label, path]) => <Link key={path} to={path}>{label}</Link>)}</nav>
+        <main className="content">{children}</main>
+    </div>;
+}
+
+function Page({ title, children, error, loading }: { title: string; children: ReactNode; error?: string; loading?: boolean }) {
+    return <section><div className="page-heading"><h1>{title}</h1></div>{error && <div className="alert error">{error}</div>}{loading ? <p>Loading...</p> : children}</section>;
+}
+
+function AuthPage({ registerMode = false }: { registerMode?: boolean }) {
+    const { user, login, register } = useAuth();
+    const navigate = useNavigate();
+    const [form, setForm] = useState({ email: "", password: "", first_name: "", last_name: "", phone: "" });
+    const [error, setError] = useState("");
+    if (user) return <Navigate to="/dashboard" replace />;
+    const submit = async (event: FormEvent) => {
+        event.preventDefault(); setError("");
+        try {
+            if (registerMode) { await register(form); navigate("/dashboard"); }
+            else { await login(form.email, form.password); navigate("/dashboard"); }
+        } catch (caught) { setError(caught instanceof Error ? caught.message : "Request failed"); }
+    };
+    return <main className="auth-page"><form className="form-panel" onSubmit={submit}><h1>{registerMode ? "Create account" : "Sign in"}</h1>
+        {error && <div className="alert error">{error}</div>}
+        {registerMode && <><label>First name<input required value={form.first_name} onChange={e => setForm({ ...form, first_name: e.target.value })} /></label><label>Last name<input required value={form.last_name} onChange={e => setForm({ ...form, last_name: e.target.value })} /></label><label>Phone<input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></label></>}
+        <label>Email<input type="email" required value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></label>
+        <label>Password<input type="password" required minLength={6} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} /></label>
+        <button type="submit">{registerMode ? "Register" : "Login"}</button>
+        <p>{registerMode ? "Already registered? " : "Need an account? "}<Link to={registerMode ? "/login" : "/register"}>{registerMode ? "Sign in" : "Register"}</Link></p>
+    </form></main>;
+}
+
+function Dashboard() {
+    const [data, setData] = useState<Record<string, number> | null>(null); const [error, setError] = useState("");
+    useEffect(() => { apiGet<Record<string, number>>("/dashboard").then(setData).catch(e => setError(e.message)); }, []);
+    return <Page title="Dashboard" error={error}>{data ? <div className="stat-grid">{Object.entries(data).map(([key, value]) => <div className="stat" key={key}><strong>{value}</strong><span>{key}</span></div>)}</div> : !error && <p>Loading...</p>}</Page>;
+}
+
+type ResourceConfig = { title: string; endpoint: string; id: string; fields: string[]; search?: string };
+const resourceConfigs: Record<string, ResourceConfig> = {
+    hotels: { title: "Hotels", endpoint: "/hotels", id: "hotel_id", fields: ["name", "address", "description", "contact_number", "email", "status"], search: "search" },
+    restaurants: { title: "Restaurants", endpoint: "/restaurants", id: "restaurant_id", fields: ["name", "address", "description", "contact_number", "email", "status"], search: "search" },
+    rooms: { title: "Rooms", endpoint: "/rooms", id: "room_id", fields: ["hotel_id", "room_number", "room_type", "capacity", "price_per_night", "status"] },
+    tables: { title: "Tables", endpoint: "/tables", id: "table_id", fields: ["restaurant_id", "table_number", "capacity", "status"] }
+};
+
+function ResourcePage({ kind }: { kind: keyof typeof resourceConfigs }) {
+    const config = resourceConfigs[kind]; const { user } = useAuth(); const manager = isManager(user);
+    const [items, setItems] = useState<Record<string, unknown>[]>([]); const [form, setForm] = useState<Record<string, string>>({}); const [editing, setEditing] = useState<number | null>(null); const [filter, setFilter] = useState(""); const [error, setError] = useState(""); const [loading, setLoading] = useState(true);
+    const load = () => { setLoading(true); const query = config.search && filter ? `?${config.search}=${encodeURIComponent(filter)}` : ""; apiGet<Record<string, unknown>[]>(`${config.endpoint}${query}`).then(setItems).catch(e => setError(e.message)).finally(() => setLoading(false)); };
+    useEffect(load, [filter]);
+    const submit = async (event: FormEvent) => { event.preventDefault(); setError(""); try { const payload: Record<string, unknown> = { ...form }; for (const field of ["hotel_id", "restaurant_id", "capacity", "price_per_night"]) if (payload[field] !== undefined && payload[field] !== "") payload[field] = Number(payload[field]); if (editing) await apiPut(`${config.endpoint}/${editing}`, payload); else await apiPost(config.endpoint, payload); setForm({}); setEditing(null); load(); } catch (e) { setError(e instanceof Error ? e.message : "Save failed"); } };
+    const remove = async (id: number) => { if (!confirm("Delete this record?")) return; try { await apiDelete(`${config.endpoint}/${id}`); load(); } catch (e) { setError(e instanceof Error ? e.message : "Delete failed"); } };
+    return <Page title={config.title} error={error} loading={loading}><div className="toolbar">{config.search && <input placeholder="Search" value={filter} onChange={e => setFilter(e.target.value)} />}</div><div className="table-wrap"><table><thead><tr>{config.fields.map(field => <th key={field}>{field}</th>)}{manager && <th>Actions</th>}</tr></thead><tbody>{items.map(item => <tr key={String(item[config.id])}>{config.fields.map(field => <td key={field}>{String(item[field] ?? "")}</td>)}{manager && <td><button onClick={() => { setEditing(Number(item[config.id])); setForm(Object.fromEntries(config.fields.map(field => [field, String(item[field] ?? "")]))); }}>Edit</button> <button onClick={() => remove(Number(item[config.id]))}>Delete</button></td>}</tr>)}</tbody></table>{!items.length && <p className="empty">No records found.</p>}</div>{manager && <form className="form-panel inline-form" onSubmit={submit}><h2>{editing ? `Edit ${config.title.slice(0, -1)}` : `Add ${config.title.slice(0, -1)}`}</h2>{config.fields.map(field => <label key={field}>{field}<input required={!field.includes("description") && field !== "email"} value={form[field] ?? ""} onChange={e => setForm({ ...form, [field]: e.target.value })} /></label>)}<button type="submit">Save</button>{editing && <button type="button" onClick={() => { setEditing(null); setForm({}); }}>Cancel</button>}</form>}</Page>;
+}
+
+function Reservations() {
+    const { user } = useAuth(); const manager = isManager(user); const [items, setItems] = useState<Reservation[]>([]); const [rooms, setRooms] = useState<Room[]>([]); const [tables, setTables] = useState<RestaurantTable[]>([]); const [selected, setSelected] = useState<Reservation | null>(null); const [history, setHistory] = useState<ReservationHistory[]>([]); const [type, setType] = useState("HOTEL"); const [statusFilter, setStatusFilter] = useState(""); const [error, setError] = useState(""); const [message, setMessage] = useState("");
+    const [form, setForm] = useState<Record<string, string>>({});
+    const load = () => apiGet<Reservation[]>(`/reservations${statusFilter ? `?status=${statusFilter}` : ""}`).then(setItems).catch(e => setError(e.message));
+    useEffect(() => { load(); apiGet<Room[]>("/rooms").then(setRooms).catch(() => undefined); apiGet<RestaurantTable[]>("/tables").then(setTables).catch(() => undefined); }, [statusFilter]);
+    const submit = async (event: FormEvent) => { event.preventDefault(); setError(""); setMessage(""); try { await apiPost("/reservations", { ...form, reservation_type: type, room_id: type === "HOTEL" ? Number(form.room_id) : null, table_id: type === "RESTAURANT" ? Number(form.table_id) : null }); setForm({}); setMessage("Reservation created"); load(); } catch (e) { setError(e instanceof Error ? e.message : "Reservation failed"); } };
+    const show = async (item: Reservation) => { setSelected(item); try { setHistory(await apiGet<ReservationHistory[]>(`/reservations/${item.reservation_id}/history`)); } catch (e) { setError(e instanceof Error ? e.message : "History failed"); } };
+    const status = async (item: Reservation, next: string) => { try { await apiPatch(`/reservations/${item.reservation_id}/status`, { status: next }); setMessage("Status updated"); load(); } catch (e) { setError(e instanceof Error ? e.message : "Status update failed"); } };
+    return <Page title="Reservations" error={error}>{message && <div className="alert success">{message}</div>}<div className="toolbar"><select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}><option value="">All statuses</option>{["Pending", "Confirmed", "Rejected", "Completed", "Cancelled"].map(s => <option key={s}>{s}</option>)}</select></div><div className="table-wrap"><table><thead><tr><th>ID</th><th>Type</th><th>Resource</th><th>Dates/times</th><th>Status</th><th>Actions</th></tr></thead><tbody>{items.map(item => <tr key={item.reservation_id}><td>{item.reservation_id}</td><td>{item.reservation_type}</td><td>{item.room_id ?? item.table_id}</td><td>{item.check_in_date ? `${item.check_in_date} to ${item.check_out_date}` : `${item.reservation_date} ${item.start_time} to ${item.end_time}`}</td><td>{item.status}</td><td><button onClick={() => show(item)}>Details</button>{manager && item.status === "Pending" && <button onClick={() => status(item, "Confirmed")}>Confirm</button>}{manager && item.status === "Confirmed" && <button onClick={() => status(item, "Completed")}>Complete</button>}</td></tr>)}</tbody></table>{!items.length && <p className="empty">No reservations found.</p>}</div><form className="form-panel reservation-form" onSubmit={submit}><h2>New reservation</h2><label>Type<select value={type} onChange={e => setType(e.target.value)}><option>HOTEL</option><option>RESTAURANT</option></select></label>{type === "HOTEL" ? <label>Room<select required value={form.room_id ?? ""} onChange={e => setForm({ ...form, room_id: e.target.value })}><option value="">Select room</option>{rooms.map(room => <option key={room.room_id} value={room.room_id}>{room.room_number} ({room.status})</option>)}</select></label> : <label>Table<select required value={form.table_id ?? ""} onChange={e => setForm({ ...form, table_id: e.target.value })}><option value="">Select table</option>{tables.map(table => <option key={table.table_id} value={table.table_id}>{table.table_number} ({table.status})</option>)}</select></label>}{type === "HOTEL" ? <><label>Check in<input required type="date" value={form.check_in_date ?? ""} onChange={e => setForm({ ...form, check_in_date: e.target.value })} /></label><label>Check out<input required type="date" value={form.check_out_date ?? ""} onChange={e => setForm({ ...form, check_out_date: e.target.value })} /></label></> : <><label>Date<input required type="date" value={form.reservation_date ?? ""} onChange={e => setForm({ ...form, reservation_date: e.target.value })} /></label><label>Start<input required type="time" value={form.start_time ?? ""} onChange={e => setForm({ ...form, start_time: e.target.value })} /></label><label>End<input required type="time" value={form.end_time ?? ""} onChange={e => setForm({ ...form, end_time: e.target.value })} /></label></>}<label>Special request<textarea value={form.special_request ?? ""} onChange={e => setForm({ ...form, special_request: e.target.value })} /></label><button type="submit">Create reservation</button></form>{selected && <div className="detail"><h2>Reservation {selected.reservation_id}</h2><p>Status: {selected.status}</p><h3>Status history</h3>{history.length ? <ul>{history.map(entry => <li key={entry.history_id}>{entry.status} at {entry.changed_at}: {entry.remarks ?? ""}</li>)}</ul> : <p>No history.</p>}<button onClick={() => setSelected(null)}>Close</button></div>}</Page>;
+}
+
+function CombinedBookings() {
+    const { user } = useAuth(); const manager = isManager(user); const [items, setItems] = useState<CombinedBooking[]>([]); const [rooms, setRooms] = useState<Room[]>([]); const [tables, setTables] = useState<RestaurantTable[]>([]); const [error, setError] = useState(""); const [message, setMessage] = useState(""); const [form, setForm] = useState({ room_id: "", check_in_date: "", check_out_date: "", table_id: "", reservation_date: "", start_time: "", end_time: "" });
+    const load = () => apiGet<CombinedBooking[]>("/combined-bookings").then(setItems).catch(e => setError(e.message));
+    useEffect(() => { load(); apiGet<Room[]>("/rooms").then(setRooms).catch(() => undefined); apiGet<RestaurantTable[]>("/tables").then(setTables).catch(() => undefined); }, []);
+    const submit = async (event: FormEvent) => { event.preventDefault(); try { await apiPost("/combined-bookings/hotel-restaurant", { hotel_reservation: { room_id: Number(form.room_id), check_in_date: form.check_in_date, check_out_date: form.check_out_date }, restaurant_reservation: { table_id: Number(form.table_id), reservation_date: form.reservation_date, start_time: form.start_time, end_time: form.end_time } }); setMessage("Combined booking created"); load(); } catch (e) { setError(e instanceof Error ? e.message : "Combined booking failed"); } };
+    const status = async (item: CombinedBooking, next: string) => { try { await apiPatch(`/combined-bookings/${item.combined_booking_id}/status`, { status: next }); load(); } catch (e) { setError(e instanceof Error ? e.message : "Status update failed"); } };
+    return <Page title="Combined bookings" error={error}>{message && <div className="alert success">{message}</div>}<div className="table-wrap"><table><thead><tr><th>ID</th><th>Status</th><th>Created</th><th>Reservations</th><th>Actions</th></tr></thead><tbody>{items.map(item => <tr key={item.combined_booking_id}><td>{item.combined_booking_id}</td><td>{item.status}</td><td>{item.created_at}</td><td>{item.reservation?.length ?? 0}</td><td>{manager && item.status === "Pending" && <button onClick={() => status(item, "Confirmed")}>Confirm</button>}{manager && item.status === "Confirmed" && <button onClick={() => status(item, "Completed")}>Complete</button>}</td></tr>)}</tbody></table>{!items.length && <p className="empty">No combined bookings found.</p>}</div><form className="form-panel reservation-form" onSubmit={submit}><h2>New hotel + restaurant booking</h2><label>Room<select required value={form.room_id} onChange={e => setForm({ ...form, room_id: e.target.value })}><option value="">Select room</option>{rooms.map(room => <option key={room.room_id} value={room.room_id}>{room.room_number}</option>)}</select></label><label>Check in<input required type="date" value={form.check_in_date} onChange={e => setForm({ ...form, check_in_date: e.target.value })} /></label><label>Check out<input required type="date" value={form.check_out_date} onChange={e => setForm({ ...form, check_out_date: e.target.value })} /></label><label>Table<select required value={form.table_id} onChange={e => setForm({ ...form, table_id: e.target.value })}><option value="">Select table</option>{tables.map(table => <option key={table.table_id} value={table.table_id}>{table.table_number}</option>)}</select></label><label>Date<input required type="date" value={form.reservation_date} onChange={e => setForm({ ...form, reservation_date: e.target.value })} /></label><label>Start<input required type="time" value={form.start_time} onChange={e => setForm({ ...form, start_time: e.target.value })} /></label><label>End<input required type="time" value={form.end_time} onChange={e => setForm({ ...form, end_time: e.target.value })} /></label><button type="submit">Create combined booking</button></form></Page>;
+}
+
+function Reports() { const [data, setData] = useState<Record<string, unknown>>({}); const [error, setError] = useState(""); useEffect(() => { Promise.all([apiGet<unknown>("/reports/reservations"), apiGet<unknown>("/reports/revenue"), apiGet<unknown>("/reports/occupancy")]).then(([reservations, revenue, occupancy]) => setData({ reservations, revenue, occupancy })).catch(e => setError(e.message)); }, []); return <Page title="Reports" error={error}>{Object.entries(data).map(([key, value]) => <div className="report-block" key={key}><h2>{key}</h2><pre>{JSON.stringify(value, null, 2)}</pre></div>)}</Page>; }
+
+function Profile() { const { user, updateProfile } = useAuth(); const [form, setForm] = useState({ first_name: user?.first_name ?? "", last_name: user?.last_name ?? "", phone: user?.phone ?? "" }); const [message, setMessage] = useState(""); const [error, setError] = useState(""); const submit = async (event: FormEvent) => { event.preventDefault(); try { await updateProfile(form); setMessage("Profile updated"); } catch (e) { setError(e instanceof Error ? e.message : "Update failed"); } }; return <Page title="Profile" error={error}>{message && <div className="alert success">{message}</div>}<form className="form-panel" onSubmit={submit}><label>Email<input value={user?.email ?? ""} disabled /></label><label>First name<input required value={form.first_name} onChange={e => setForm({ ...form, first_name: e.target.value })} /></label><label>Last name<input required value={form.last_name} onChange={e => setForm({ ...form, last_name: e.target.value })} /></label><label>Phone<input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></label><button type="submit">Save profile</button></form></Page>; }
+
+export function App() {
+    return <Routes><Route path="/login" element={<AuthPage />} /><Route path="/register" element={<AuthPage registerMode />} /><Route path="*" element={<Protected><AppLayout><Routes><Route path="/" element={<Navigate to="/dashboard" replace />} /><Route path="/dashboard" element={<Dashboard />} /><Route path="/hotels" element={<ResourcePage kind="hotels" />} /><Route path="/restaurants" element={<ResourcePage kind="restaurants" />} /><Route path="/rooms" element={<ResourcePage kind="rooms" />} /><Route path="/tables" element={<ResourcePage kind="tables" />} /><Route path="/reservations" element={<Reservations />} /><Route path="/combined-bookings" element={<CombinedBookings />} /><Route path="/reports" element={<Reports />} /><Route path="/profile" element={<Profile />} /><Route path="*" element={<Navigate to="/dashboard" replace />} /></Routes></AppLayout></Protected>} /></Routes>;
+}
