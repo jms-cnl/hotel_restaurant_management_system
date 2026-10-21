@@ -1,6 +1,9 @@
 import type { ApiError } from "./types";
 
 const tokenKey = "hrm_access_token";
+const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/+$/, "");
+
+const apiUrl = (path: string) => `${apiBaseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 
 export const getToken = () => localStorage.getItem(tokenKey);
 export const setToken = (token: string | null) => token ? localStorage.setItem(tokenKey, token) : localStorage.removeItem(tokenKey);
@@ -11,7 +14,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
     const token = getToken();
     if (token) headers.set("Authorization", `Bearer ${token}`);
 
-    const response = await fetch(`/api${path}`, { ...options, headers });
+    const response = await fetch(apiUrl(path), { ...options, headers });
     const text = await response.text();
     let body: unknown = null;
     try { body = text ? JSON.parse(text) : null; } catch { body = text; }
@@ -40,7 +43,7 @@ export async function apiUpload<T>(path: string, file: File, fields: Record<stri
     const headers = new Headers();
     const token = getToken();
     if (token) headers.set("Authorization", `Bearer ${token}`);
-    const response = await fetch(`/api${path}`, { method, body: form, headers });
+    const response = await fetch(apiUrl(path), { method, body: form, headers });
     const text = await response.text();
     let body: unknown = null;
     try { body = text ? JSON.parse(text) : null; } catch { body = text; }

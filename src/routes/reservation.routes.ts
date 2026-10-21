@@ -15,7 +15,7 @@ const router = Router();
 router.use(authenticate);
 router.get("/", scopeToAuthenticatedUser, getReservationsController);
 router.get("/:id", requireOwnedRecord("reservation"), getReservationByIdController);
-router.post("/", requireSelfPayload, createReservationController);
+router.post("/", requireRole("Customer", "Staff", "Admin"), requireSelfPayload, createReservationController);
 router.put("/:id", requireOwnedRecord("reservation"), requireSelfPayload, updateReservationController);
 router.delete("/:id", requireOwnedRecord("reservation"), deleteReservationController);
 router.patch("/:id/status", requireRole("Admin", "Staff"), changeReservationStatusController);

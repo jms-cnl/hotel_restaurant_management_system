@@ -15,8 +15,8 @@ const router = Router();
 
 router.use(authenticate);
 router.get("/", scopeToAuthenticatedUser, getCombinedBookingsController);
-router.post("/", requireSelfPayload, createCombinedBookingController);
-router.post("/hotel-restaurant", requireSelfPayload, createHotelRestaurantCombinedBookingController);
+router.post("/", requireRole("Customer", "Staff", "Admin"), requireSelfPayload, createCombinedBookingController);
+router.post("/hotel-restaurant", requireRole("Customer", "Staff", "Admin"), requireSelfPayload, createHotelRestaurantCombinedBookingController);
 router.get("/:id/reservations", requireOwnedRecord("combined_booking"), getCombinedBookingReservationsController);
 router.patch("/:id/status", requireRole("Admin", "Staff"), changeCombinedBookingStatusController);
 router.get("/:id", requireOwnedRecord("combined_booking"), getCombinedBookingByIdController);
