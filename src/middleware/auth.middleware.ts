@@ -54,6 +54,31 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     }
 };
 
+export const requireRecoveryToken = (req: Request, res: Response, next: NextFunction) => {
+    const token = getBearerToken(req);
+
+    try {
+        const payload = token?.split(".")[1];
+        if (!payload) throw new Error("Invalid token");
+
+        const claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+            amr?: Array<string | { method?: string }>;
+        };
+        const isRecovery = claims.amr?.some((entry) =>
+            typeof entry === "string" ? entry === "recovery" : entry.method === "recovery"
+        );
+
+        if (isRecovery) {
+            next();
+            return;
+        }
+    } catch {
+        // Reject malformed tokens; authenticate must run first to verify valid tokens.
+    }
+
+    res.status(403).json({ message: "Password reset requires a recovery link" });
+};
+
 export const requireRole = (...allowedRoles: string[]) => {
     const allowed = new Set(allowedRoles.map((role) => role.toLowerCase()));
 

@@ -78,9 +78,20 @@ export const changePassword = async (req: Request, currentPassword: string, newP
 
 export const resetPassword = async (req: Request, newPassword: string) => {
     assertPasswordPolicy(newPassword);
-    const client = getRequestSupabase(req);
-    const { error } = await client.auth.updateUser({ password: newPassword });
-    if (error) throw new Error("Reset session is invalid or expired");
+    const token = getBearerToken(req);
+    if (!token) throw new Error("Reset session is invalid or expired");
+
+    const response = await fetch(`${process.env.SUPABASE_URL!.replace(/\/+$/, "")}/auth/v1/user`, {
+        method: "PUT",
+        headers: {
+            apikey: process.env.SUPABASE_KEY!,
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ password: newPassword })
+    });
+
+    if (!response.ok) throw new Error("Reset session is invalid or expired");
 };
 
 export const logoutUser = async (req: Request) => {
