@@ -2,6 +2,15 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "re
 import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut, apiUpload, setToken } from "./api";
 import { useAuth } from "./auth";
+import { CustomerHome } from "./components/CustomerHome";
+import { CustomerLayout } from "./components/CustomerLayout";
+import { HotelDetails } from "./components/HotelDetails";
+import { HotelDiscovery } from "./components/HotelDiscovery";
+import { RestaurantDetails } from "./components/RestaurantDetails";
+import { RestaurantDiscovery } from "./components/RestaurantDiscovery";
+import { CustomerReservations } from "./components/CustomerReservations";
+import { CustomerCombinedBookings } from "./components/CustomerCombinedBookings";
+import { buildCombinedBookingPayload } from "./customerData";
 import { passwordErrors, passwordRequirements } from "./passwordPolicy";
 import type { CombinedBooking, Hotel, Media, Reservation, ReservationHistory, Restaurant, RestaurantTable, Room, User } from "./types";
 
@@ -25,6 +34,7 @@ function RoleRoute({ roles, children }: { roles: string[]; children: ReactNode }
 function AppLayout({ children }: { children: ReactNode }) {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    if (!isManager(user)) return <CustomerLayout>{children}</CustomerLayout>;
     const links = role(user) === "Customer"
         ? [["Home", "/home"], ["Hotels", "/hotels"], ["Restaurants", "/restaurants"], ["My Reservations", "/reservations"], ["My Combined Bookings", "/combined-bookings"], ["Notifications", "/notifications"], ["Profile", "/profile"]]
         : [["Dashboard", "/dashboard"], ["Hotels", "/hotels"], ["Restaurants", "/restaurants"], ["Rooms", "/rooms"], ["Tables", "/tables"], ["Reservations", "/reservations"], ["Combined Bookings", "/combined-bookings"], ["Reports", "/reports"], ...(isAdmin(user) ? [["Users", "/users"]] : []), ["Notifications", "/notifications"], ["Profile", "/profile"]];
@@ -58,15 +68,21 @@ function AuthPage({ registerMode = false }: { registerMode?: boolean }) {
             else { await login(form.email, form.password); navigate("/"); }
         } catch (caught) { setError(caught instanceof Error ? caught.message : "Request failed"); }
     };
-    return <main className="auth-page"><form className="form-panel" onSubmit={submit}><h1>{registerMode ? "Create account" : "Sign in"}</h1>
-        {error && <div className="alert error">{error}</div>}
-        {registerMode && <><label>First name<input required value={form.first_name} onChange={e => setForm({ ...form, first_name: e.target.value })} /></label><label>Last name<input required value={form.last_name} onChange={e => setForm({ ...form, last_name: e.target.value })} /></label><label>Phone<input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></label></>}
-        <label>Email<input type="email" required value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></label>
-        <label>Password<input type="password" required value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} /></label>
-        {registerMode && <PasswordRequirements password={form.password} />}
-        <button type="submit">{registerMode ? "Register" : "Login"}</button>
-        {!registerMode && <p><Link to="/forgot-password">Forgot Password?</Link></p>}
-        <p>{registerMode ? "Already registered? " : "Need an account? "}<Link to={registerMode ? "/login" : "/register"}>{registerMode ? "Sign in" : "Register"}</Link></p>
+    return <main className="auth-page"><form className="auth-card" onSubmit={submit}>
+        <Link to="/login" className="auth-brand">StayEase</Link>
+        <p className="auth-eyebrow">{registerMode ? "START YOUR NEXT GETAWAY" : "WELCOME BACK"}</p>
+        <h1>{registerMode ? "Create your account" : "Log in to StayEase"}</h1>
+        <p className="auth-description">{registerMode ? "Create an account to manage reservations." : "Access your reservations and account."}</p>
+        {error && <div className="alert error" role="alert">{error}</div>}
+        <div className="auth-form">
+            {registerMode && <><label>First name<input autoComplete="given-name" required value={form.first_name} onChange={e => setForm({ ...form, first_name: e.target.value })} /></label><label>Last name<input autoComplete="family-name" required value={form.last_name} onChange={e => setForm({ ...form, last_name: e.target.value })} /></label><label>Phone<input autoComplete="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></label></>}
+            <label>Email address<input type="email" autoComplete="email" required value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></label>
+            <label>Password<input type="password" autoComplete={registerMode ? "new-password" : "current-password"} required value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} /></label>
+            {registerMode && <PasswordRequirements password={form.password} />}
+            {!registerMode && <Link to="/forgot-password" className="auth-home-link">Forgot password?</Link>}
+            <button className="auth-button" type="submit">{registerMode ? "Create account" : "Log in"}</button>
+        </div>
+        <p className="auth-switch">{registerMode ? "Already registered? " : "Need an account? "}<Link to={registerMode ? "/login" : "/register"}>{registerMode ? "Sign in" : "Register"}</Link></p>
     </form></main>;
 }
 
@@ -77,7 +93,27 @@ function Dashboard() {
 }
 
 function Home() {
-    return <Page title="Home"><div className="detail"><p>Browse hotels and restaurants, then create reservations from the available resources.</p><p>Use the navigation to view your own reservations, combined bookings, notifications, and profile.</p></div></Page>;
+    return <CustomerHome />;
+}
+
+function HotelCatalogRoute() {
+    const { user } = useAuth();
+    return isManager(user) ? <ResourcePage kind="hotels" /> : <HotelDiscovery />;
+}
+
+function RestaurantCatalogRoute() {
+    const { user } = useAuth();
+    return isManager(user) ? <ResourcePage kind="restaurants" /> : <RestaurantDiscovery />;
+}
+
+function ReservationsRoute() {
+    const { user } = useAuth();
+    return isManager(user) ? <Reservations /> : <CustomerReservations />;
+}
+
+function CombinedBookingsRoute() {
+    const { user } = useAuth();
+    return isManager(user) ? <CombinedBookings /> : <CustomerCombinedBookings />;
 }
 
 function Notifications() {
@@ -95,14 +131,14 @@ function Users() {
 function ForgotPassword() {
     const [email, setEmail] = useState(""); const [error, setError] = useState(""); const [message, setMessage] = useState(""); const [loading, setLoading] = useState(false);
     const submit = async (event: FormEvent) => { event.preventDefault(); setLoading(true); setError(""); setMessage(""); try { const result = await apiPost<{ message: string }>("/auth/forgot-password", { email }); setMessage(result.message); } catch (e) { setError(e instanceof Error ? e.message : "Unable to request password reset"); } finally { setLoading(false); } };
-    return <main className="auth-page"><form className="form-panel" onSubmit={submit}><h1>Forgot Password</h1>{error && <div className="alert error">{error}</div>}{message && <div className="alert success">{message}</div>}<label>Email<input type="email" required value={email} onChange={e => setEmail(e.target.value)} /></label><button disabled={loading} type="submit">{loading ? "Sending..." : "Send Reset Link"}</button><Link to="/login">Back to login</Link></form></main>;
+    return <main className="auth-page"><form className="auth-card" onSubmit={submit}><Link to="/login" className="auth-brand">StayEase</Link><p className="auth-eyebrow">ACCOUNT RECOVERY</p><h1>Forgot password?</h1><p className="auth-description">Enter your account email and we’ll send a recovery link.</p>{error && <div className="alert error" role="alert">{error}</div>}{message && <div className="alert success" role="status">{message}</div>}<div className="auth-form"><label>Email address<input type="email" autoComplete="email" required value={email} onChange={e => setEmail(e.target.value)} /></label><button className="auth-button" disabled={loading} type="submit">{loading ? "Sending…" : "Send reset link"}</button><Link className="auth-home-link" to="/login">Back to login</Link></div></form></main>;
 }
 
 function ResetPassword() {
     const navigate = useNavigate(); const [newPassword, setNewPassword] = useState(""); const [confirmPassword, setConfirmPassword] = useState(""); const [error, setError] = useState(""); const [message, setMessage] = useState(""); const [loading, setLoading] = useState(true);
     useEffect(() => { const params = new URLSearchParams(window.location.hash.replace(/^#/, "")); const accessToken = params.get("access_token"); if (!accessToken || params.get("type") !== "recovery") setError("This password reset link is invalid or expired."); else setToken(accessToken); setLoading(false); }, []);
     const submit = async (event: FormEvent) => { event.preventDefault(); setError(""); if (passwordErrors(newPassword).length) { setError(`Password does not meet the requirements: ${passwordErrors(newPassword).join(", ")}`); return; } if (newPassword !== confirmPassword) { setError("Password confirmation does not match"); return; } setLoading(true); try { const result = await apiPost<{ message: string }>("/auth/reset-password", { new_password: newPassword }); setMessage(result.message); setToken(null); } catch (e) { setError(e instanceof Error ? e.message : "Reset session is invalid or expired"); } finally { setLoading(false); } };
-    return <main className="auth-page"><form className="form-panel" onSubmit={submit}><h1>Reset Password</h1>{error && <div className="alert error">{error}</div>}{message ? <><div className="alert success">{message}</div><button type="button" onClick={() => navigate("/login")}>Back to login</button></> : <>{!loading && <><label>New password<input type="password" required value={newPassword} onChange={e => setNewPassword(e.target.value)} /></label><PasswordRequirements password={newPassword} /><label>Confirm password<input type="password" required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} /></label><button disabled={loading} type="submit">Update Password</button></>}</>}</form></main>;
+    return <main className="auth-page"><form className="auth-card" onSubmit={submit}><Link to="/login" className="auth-brand">StayEase</Link><p className="auth-eyebrow">ACCOUNT RECOVERY</p><h1>Set a new password</h1>{error && <div className="alert error" role="alert">{error}</div>}{message ? <><div className="alert success" role="status">{message}</div><button className="auth-button" type="button" onClick={() => navigate("/login")}>Back to login</button></> : <>{!loading && <div className="auth-form"><label>New password<input type="password" autoComplete="new-password" required value={newPassword} onChange={e => setNewPassword(e.target.value)} /></label><PasswordRequirements password={newPassword} /><label>Confirm password<input type="password" autoComplete="new-password" required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} /></label><button className="auth-button" disabled={loading} type="submit">Update password</button></div>}</>}</form></main>;
 }
 
 function LandingRedirect() {
@@ -157,7 +193,7 @@ function CombinedBookings() {
     const { user } = useAuth(); const manager = isManager(user); const [items, setItems] = useState<CombinedBooking[]>([]); const [rooms, setRooms] = useState<Room[]>([]); const [tables, setTables] = useState<RestaurantTable[]>([]); const [error, setError] = useState(""); const [message, setMessage] = useState(""); const [form, setForm] = useState({ room_id: "", check_in_date: "", check_out_date: "", table_id: "", reservation_date: "", start_time: "", end_time: "" });
     const load = () => apiGet<CombinedBooking[]>("/combined-bookings").then(setItems).catch(e => setError(e.message));
     useEffect(() => { load(); apiGet<Room[]>("/rooms").then(setRooms).catch(() => undefined); apiGet<RestaurantTable[]>("/tables").then(setTables).catch(() => undefined); }, []);
-    const submit = async (event: FormEvent) => { event.preventDefault(); try { await apiPost("/combined-bookings/hotel-restaurant", { hotel_reservation: { room_id: Number(form.room_id), check_in_date: form.check_in_date, check_out_date: form.check_out_date }, restaurant_reservation: { table_id: Number(form.table_id), reservation_date: form.reservation_date, start_time: form.start_time, end_time: form.end_time } }); setMessage("Combined booking created"); load(); } catch (e) { setError(e instanceof Error ? e.message : "Combined booking failed"); } };
+    const submit = async (event: FormEvent) => { event.preventDefault(); setError(""); setMessage(""); try { await apiPost("/combined-bookings/hotel-restaurant", buildCombinedBookingPayload({ roomId: Number(form.room_id), checkIn: form.check_in_date, checkOut: form.check_out_date, tableId: Number(form.table_id), date: form.reservation_date, startTime: form.start_time, endTime: form.end_time })); setMessage("Combined booking created"); load(); } catch (e) { setError(e instanceof Error ? e.message : "Combined booking failed"); } };
     const status = async (item: CombinedBooking, next: string) => { try { await apiPatch(`/combined-bookings/${item.combined_booking_id}/status`, { status: next }); load(); } catch (e) { setError(e instanceof Error ? e.message : "Status update failed"); } };
     return <Page title="Combined bookings" error={error}>{message && <div className="alert success">{message}</div>}<div className="table-wrap"><table><thead><tr><th>ID</th><th>Status</th><th>Created</th><th>Reservations</th><th>Actions</th></tr></thead><tbody>{items.map(item => <tr key={item.combined_booking_id}><td>{item.combined_booking_id}</td><td>{item.status}</td><td>{item.created_at}</td><td>{item.reservation?.length ?? 0}</td><td>{manager && item.status === "Pending" && <button onClick={() => status(item, "Confirmed")}>Confirm</button>}{manager && item.status === "Confirmed" && <button onClick={() => status(item, "Completed")}>Complete</button>}</td></tr>)}</tbody></table>{!items.length && <p className="empty">No combined bookings found.</p>}</div><form hidden={!canCreateReservations(user)} className="form-panel reservation-form" onSubmit={submit}><h2>New hotel + restaurant booking</h2><label>Room<select required value={form.room_id} onChange={e => setForm({ ...form, room_id: e.target.value })}><option value="">Select room</option>{rooms.map(room => <option key={room.room_id} value={room.room_id}>{room.room_number}</option>)}</select></label><label>Check in<input required type="date" value={form.check_in_date} onChange={e => setForm({ ...form, check_in_date: e.target.value })} /></label><label>Check out<input required type="date" value={form.check_out_date} onChange={e => setForm({ ...form, check_out_date: e.target.value })} /></label><label>Table<select required value={form.table_id} onChange={e => setForm({ ...form, table_id: e.target.value })}><option value="">Select table</option>{tables.map(table => <option key={table.table_id} value={table.table_id}>{table.table_number}</option>)}</select></label><label>Date<input required type="date" value={form.reservation_date} onChange={e => setForm({ ...form, reservation_date: e.target.value })} /></label><label>Start<input required type="time" value={form.start_time} onChange={e => setForm({ ...form, start_time: e.target.value })} /></label><label>End<input required type="time" value={form.end_time} onChange={e => setForm({ ...form, end_time: e.target.value })} /></label><button type="submit">Create combined booking</button></form></Page>;
 }
@@ -175,5 +211,5 @@ function Reports() {
 function Profile() { const { user, updateProfile } = useAuth(); const [form, setForm] = useState({ first_name: user?.first_name ?? "", last_name: user?.last_name ?? "", phone: user?.phone ?? "" }); const [passwordForm, setPasswordForm] = useState({ current: "", next: "", confirm: "" }); const [message, setMessage] = useState(""); const [error, setError] = useState(""); const submit = async (event: FormEvent) => { event.preventDefault(); setError(""); try { await updateProfile(form); setMessage("Profile updated"); } catch (e) { setError(e instanceof Error ? e.message : "Update failed"); } }; const changePassword = async (event: FormEvent) => { event.preventDefault(); setError(""); setMessage(""); if (passwordErrors(passwordForm.next).length) { setError(`Password does not meet the requirements: ${passwordErrors(passwordForm.next).join(", ")}`); return; } if (passwordForm.next !== passwordForm.confirm) { setError("Password confirmation does not match"); return; } try { const result = await apiPost<{ message: string }>("/auth/change-password", { current_password: passwordForm.current, new_password: passwordForm.next }); setMessage(result.message); setPasswordForm({ current: "", next: "", confirm: "" }); } catch (e) { setError(e instanceof Error ? e.message : "Password change failed"); } }; return <Page title="Profile" error={error}>{message && <div className="alert success">{message}</div>}<form className="form-panel" onSubmit={submit}><h2>Profile details</h2><label>Email<input value={user?.email ?? ""} disabled /></label><label>First name<input required value={form.first_name} onChange={e => setForm({ ...form, first_name: e.target.value })} /></label><label>Last name<input required value={form.last_name} onChange={e => setForm({ ...form, last_name: e.target.value })} /></label><label>Phone<input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></label><button type="submit">Save profile</button></form><form className="form-panel password-form" onSubmit={changePassword}><h2>Change Password</h2><label>Current password<input type="password" required value={passwordForm.current} onChange={e => setPasswordForm({ ...passwordForm, current: e.target.value })} /></label><label>New password<input type="password" required value={passwordForm.next} onChange={e => setPasswordForm({ ...passwordForm, next: e.target.value })} /></label><PasswordRequirements password={passwordForm.next} /><label>Confirm new password<input type="password" required value={passwordForm.confirm} onChange={e => setPasswordForm({ ...passwordForm, confirm: e.target.value })} /></label><button type="submit">Change Password</button></form></Page>; }
 
 export function App() {
-    return <Routes><Route path="/login" element={<AuthPage />} /><Route path="/register" element={<AuthPage registerMode />} /><Route path="/forgot-password" element={<ForgotPassword />} /><Route path="/reset-password" element={<ResetPassword />} /><Route path="*" element={<Protected><AppLayout><Routes><Route path="/" element={<LandingRedirect />} /><Route path="/home" element={<Home />} /><Route path="/dashboard" element={<RoleRoute roles={["Staff", "Admin"]}><Dashboard /></RoleRoute>} /><Route path="/hotels" element={<ResourcePage kind="hotels" />} /><Route path="/restaurants" element={<ResourcePage kind="restaurants" />} /><Route path="/rooms" element={<ResourcePage kind="rooms" />} /><Route path="/tables" element={<ResourcePage kind="tables" />} /><Route path="/reservations" element={<Reservations />} /><Route path="/combined-bookings" element={<CombinedBookings />} /><Route path="/reports" element={<RoleRoute roles={["Staff", "Admin"]}><Reports /></RoleRoute>} /><Route path="/users" element={<RoleRoute roles={["Admin"]}><Users /></RoleRoute>} /><Route path="/notifications" element={<Notifications />} /><Route path="/profile" element={<Profile />} /><Route path="*" element={<Navigate to="/home" replace />} /></Routes></AppLayout></Protected>} /></Routes>;
+    return <Routes><Route path="/login" element={<AuthPage />} /><Route path="/register" element={<AuthPage registerMode />} /><Route path="/forgot-password" element={<ForgotPassword />} /><Route path="/reset-password" element={<ResetPassword />} /><Route path="*" element={<Protected><AppLayout><Routes><Route path="/" element={<LandingRedirect />} /><Route path="/home" element={<Home />} /><Route path="/dashboard" element={<RoleRoute roles={["Staff", "Admin"]}><Dashboard /></RoleRoute>} /><Route path="/hotels" element={<HotelCatalogRoute />} /><Route path="/hotels/:hotelId" element={<HotelDetails />} /><Route path="/restaurants" element={<RestaurantCatalogRoute />} /><Route path="/restaurants/:restaurantId" element={<RestaurantDetails />} /><Route path="/rooms" element={<RoleRoute roles={["Staff", "Admin"]}><ResourcePage kind="rooms" /></RoleRoute>} /><Route path="/tables" element={<RoleRoute roles={["Staff", "Admin"]}><ResourcePage kind="tables" /></RoleRoute>} /><Route path="/reservations" element={<ReservationsRoute />} /><Route path="/combined-bookings" element={<CombinedBookingsRoute />} /><Route path="/reports" element={<RoleRoute roles={["Staff", "Admin"]}><Reports /></RoleRoute>} /><Route path="/users" element={<RoleRoute roles={["Admin"]}><Users /></RoleRoute>} /><Route path="/notifications" element={<Notifications />} /><Route path="/profile" element={<Profile />} /><Route path="*" element={<Navigate to="/home" replace />} /></Routes></AppLayout></Protected>} /></Routes>;
 }
