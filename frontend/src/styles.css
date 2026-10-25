@@ -151,6 +151,7 @@ button:hover { background: #e5e7eb; }
 }
 .manager-app .staff-status.confirmed { color: #70d5a2; background: #24483e; }
 .manager-app .staff-status.pending { color: #f1a36e; background: #4a352d; }
+.manager-app .staff-status.rejected { color: #e36b72; background: #3d2832; }
 .manager-app .staff-status.cancelled { color: #e36b72; background: #3d2832; }
 .manager-app .staff-status.completed { color: #8fa8c4; background: #283749; }
 
