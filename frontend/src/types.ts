@@ -30,6 +30,7 @@ export type Reservation = {
     special_request?: string | null;
     combined_booking_id?: number | null;
     created_at?: string;
+    user?: User | null;
     room?: Room;
     restaurant_table?: RestaurantTable;
 };
