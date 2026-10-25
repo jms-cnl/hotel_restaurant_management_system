@@ -11,6 +11,314 @@ button:hover { background: #e5e7eb; }
 .nav { display: flex; flex-wrap: wrap; gap: .8rem; padding: .7rem 1.2rem; background: #fff; border-bottom: 1px solid #d1d5db; }
 .nav a { color: #1d4ed8; text-decoration: none; }
 .content { max-width: 1200px; margin: 0 auto; padding: 1.2rem; }
+.manager-app .staff-dashboard-page {
+  color: #f8f7f4;
+}
+
+.manager-app .staff-role-label {
+  display: block;
+  font-size: 0.7rem;
+  opacity: 0.75;
+}
+
+.manager-app .staff-manage-description {
+  color: #c7ced9;
+  margin-bottom: 24px;
+}
+
+.manager-app .staff-dashboard-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+.manager-app .staff-dashboard-heading h1 {
+  margin-bottom: 8px;
+}
+
+.manager-app .staff-dashboard-badge {
+  border: 1px solid #574b30;
+  border-radius: 20px;
+  padding: 7px 14px;
+  color: #e7c99a;
+  background: #242536;
+  font-size: 0.8rem;
+}
+
+.manager-app .staff-dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  max-width: 850px;
+  margin-bottom: 24px;
+}
+
+.manager-app .staff-dashboard-stat {
+  position: relative;
+  min-height: 100px;
+  padding: 18px;
+  border: 1px solid #344158;
+  border-radius: 12px;
+  background: #1e2d3d;
+}
+
+.manager-app .staff-dashboard-stat p {
+  color: #a9b7c8;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  margin: 0 0 20px;
+}
+
+.manager-app .staff-stat-icon {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+}
+
+.manager-app .staff-dashboard-stat strong {
+  display: block;
+  color: #65c69a;
+  font-size: 1.5rem;
+}
+
+.manager-app .staff-dashboard-stat strong.orange-stat {
+  color: #f19b6a;
+}
+
+.manager-app .staff-dashboard-stat strong.gold-stat {
+  color: #e7c99a;
+}
+
+.manager-app .staff-dashboard-stat small {
+  display: block;
+  color: #94a4b8;
+  margin-top: 5px;
+}
+
+.manager-app .staff-dashboard-panel {
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid #344158;
+  border-radius: 12px;
+  background: #1e2d3d;
+}
+
+.manager-app .staff-dashboard-panel h2 {
+  color: #f8f7f4;
+  font-size: 1.1rem;
+  margin: 0 0 18px;
+}
+
+.manager-app .staff-activity-list {
+  display: grid;
+  gap: 13px;
+}
+.manager-app .staff-activity-list article {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.manager-app .staff-activity-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: #2c3d4e;
+}
+.manager-app .staff-activity-list article > div {
+  flex: 1;
+  min-width: 0;
+}
+.manager-app .staff-activity-list strong {
+  color: #f8f7f4;
+  font-size: 0.85rem;
+}
+.manager-app .staff-activity-list p {
+  margin: 3px 0 0;
+  color: #a9b7c8;
+  font-size: 0.78rem;
+}
+.manager-app .staff-status {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+.manager-app .staff-status.confirmed { color: #70d5a2; background: #24483e; }
+.manager-app .staff-status.pending { color: #f1a36e; background: #4a352d; }
+.manager-app .staff-status.rejected { color: #e36b72; background: #3d2832; }
+.manager-app .staff-status.cancelled { color: #e36b72; background: #3d2832; }
+.manager-app .staff-status.completed { color: #8fa8c4; background: #283749; }
+
+.manager-app .staff-status-breakdown {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.manager-app .staff-status-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: #b9c5d3;
+  font-size: 0.78rem;
+  margin-bottom: 8px;
+}
+
+.manager-app .staff-status-label strong {
+  color: #f8f7f4;
+}
+
+.manager-app .staff-status-track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: #111c2b;
+}
+
+.manager-app .staff-status-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.manager-app .staff-status-track .confirmed {
+  background: #65c69a;
+}
+
+.manager-app .staff-status-track .pending {
+  background: #f19b6a;
+}
+
+.manager-app .staff-status-track .cancelled {
+  background: #e36b72;
+}
+
+.manager-app .staff-status-track .completed {
+  background: #8fa8c4;
+}
+
+.manager-app .staff-status-item small {
+  display: block;
+  margin-top: 5px;
+  color: #94a4b8;
+}
+
+@media (max-width: 700px) {
+  .manager-app .staff-dashboard-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .manager-app .staff-status-breakdown {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .manager-app .staff-dashboard-heading {
+    flex-direction: column;
+  }
+}
+.manager-app .staff-manage-page {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 20px clamp(12px, 2vw, 28px);
+  box-sizing: border-box;
+}
+.manager-app .staff-manage-page *,
+.manager-app .staff-manage-page *::before,
+.manager-app .staff-manage-page *::after { box-sizing: border-box; }
+.manager-app .staff-manage-tabs {
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 16px;
+  border-bottom: 1px solid #344158;
+}
+.manager-app .staff-manage-tab {
+  display: flex; align-items: center; gap: 10px; padding: 9px 13px;
+  border: 0; border-bottom: 2px solid transparent; background: transparent;
+  color: #aebbc9; cursor: pointer; font: inherit; text-decoration: none;
+}
+.manager-app .staff-manage-tab.active { color: #e7c99a; border-bottom-color: #e7c99a; }
+.manager-app .staff-manage-tab span {
+  padding: 2px 8px; border-radius: 12px; background: #2a374a;
+  color: #f8f7f4; font-size: 0.75rem;
+}
+.manager-app .staff-manage-toolbar {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  gap: 12px; margin-bottom: 18px; color: #aebbc9; font-size: 0.85rem;
+}
+.manager-app .staff-manage-toolbar input {
+  flex: 1 1 320px; width: 100%; max-width: 440px; min-width: 0; padding: 12px 14px;
+  border: 1px solid #344158; border-radius: 8px; background: #111c2e;
+  color: #f8f7f4; font: inherit;
+}
+.manager-app .staff-table-wrap {
+  width: 100%; max-width: 100%; overflow-x: auto; border: 1px solid #344158;
+  border-radius: 12px; background: #111c2e;
+}
+.manager-app .staff-reservations-table {
+  width: 100%; min-width: 0; table-layout: auto; border-collapse: collapse;
+  text-align: left; font-size: 0.8rem;
+}
+.manager-app .staff-reservations-table th {
+  padding: 12px 8px; background: #1e2d3d; color: #c6d0dd; font-size: 0.72rem;
+  letter-spacing: 0.03em; text-transform: uppercase; white-space: normal;
+}
+.manager-app .staff-reservations-table td {
+  padding: 12px 8px; border-top: 1px solid #29384b; color: #edf0f5;
+  font-size: 0.82rem; vertical-align: middle; overflow-wrap: anywhere;
+}
+.manager-app .staff-reservations-table td strong,
+.manager-app .staff-reservations-table td small { display: block; }
+.manager-app .staff-reservations-table td small {
+  margin-top: 5px; color: #9cabbc; font-size: 0.75rem;
+}
+.manager-app .staff-reservations-table td:last-child { min-width: 220px; overflow-wrap: normal; }
+.manager-app .staff-status-select {
+  width: 100%; max-width: 130px; padding: 7px 9px; border: 1px solid #48546a;
+  border-radius: 7px; background: #172438; color: #f8f7f4;
+}
+.manager-app .staff-status-select.confirmed { border-color: #377b61; }
+.manager-app .staff-status-select.pending { border-color: #98613b; }
+.manager-app .staff-status-select.cancelled { border-color: #9b4d50; }
+.manager-app .staff-status-select.completed { border-color: #657d99; }
+.manager-app .staff-table-actions {
+  display: flex; flex-flow: row nowrap; align-items: center; gap: 6px; white-space: nowrap;
+}
+.manager-app .staff-table-actions button {
+  flex: 0 0 auto; padding: 8px 12px; border: 1px solid #48546a; border-radius: 7px;
+  background: #1e2d3d; color: #f8f7f4; font: inherit; font-size: 0.8rem;
+  cursor: pointer; white-space: nowrap; transition: background 0.2s ease, border-color 0.2s ease;
+}
+.manager-app .staff-table-actions button:hover { background: #2a374a; border-color: #e7c99a; }
+.manager-app .staff-empty-state {
+  padding: 30px !important; text-align: center; color: #aebbc9 !important;
+}
+.manager-app .staff-manage-panel {
+  background: #111c2e; border: 1px solid #344158; border-radius: 12px;
+  padding: 20px; margin-top: 18px;
+}
+.manager-app .staff-manage-panel h2 { color: #e7c99a; }
+.manager-app .staff-manage-panel p { color: #e3e7ee; overflow-wrap: anywhere; }
+.manager-app .staff-secondary-button {
+  border: 1px solid #48546a; border-radius: 8px; padding: 10px 15px;
+  background: #151f32; color: #f8f7f4; cursor: pointer; font: inherit;
+}
+.manager-app .staff-secondary-button:hover { border-color: #e4bd70; }
+@media (max-width: 900px) {
+  .manager-app .staff-reservations-table th,
+  .manager-app .staff-reservations-table td { padding: 9px 6px; }
+  .manager-app .staff-table-actions { gap: 4px; }
+  .manager-app .staff-table-actions button { padding: 7px 8px; font-size: 0.75rem; }
+}
+@media (max-width: 650px) {
+  .manager-app .staff-manage-toolbar { align-items: stretch; flex-direction: column; }
+  .manager-app .staff-manage-toolbar input { flex: 1 1 auto; max-width: none; }
+}
+
 .page-heading { display: flex; justify-content: space-between; align-items: center; }
 h1 { margin-top: 0; }
 .center, .auth-page { min-height: 100vh; display: grid; place-items: center; }
@@ -49,3 +357,43 @@ th { background: #e5e7eb; }
 .requirement-met { color: #166534; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 640px) { .topbar { flex-wrap: wrap; } .topbar .brand { width: 100%; } .content { padding: .8rem; } }
+
+.manager-app .customer-navbar {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+.manager-app .customer-logo,
+.manager-app .customer-nav-links,
+.manager-app .customer-nav-actions {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+.manager-app .customer-nav-links a,
+.manager-app .customer-nav-actions a {
+  text-decoration: none;
+  white-space: nowrap;
+}
+@media (max-width: 850px) {
+  .manager-app .customer-nav-links {
+    order: initial;
+    width: auto;
+    justify-content: flex-start;
+  }
+}
+.manager-app .sample-card {
+  color: #172033;
+}
+.manager-app .hotel-room-card {
+  grid-template-columns: minmax(0, 1fr) 125px;
+}
+.manager-app .table-wrap,
+.manager-app .table-wrap table,
+.manager-app .detail,
+.manager-app .report-block,
+.manager-app .form-panel,
+.manager-app .media-manager {
+  color: #1f2937;
+}
+.manager-app .table-wrap th { color: #1f2937; }
+.manager-app .empty { color: #c1c8d4; }

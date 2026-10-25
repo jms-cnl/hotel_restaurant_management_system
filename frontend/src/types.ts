@@ -30,10 +30,11 @@ export type Reservation = {
     special_request?: string | null;
     combined_booking_id?: number | null;
     created_at?: string;
+    user?: User | null;
     room?: Room;
     restaurant_table?: RestaurantTable;
 };
 export type ReservationHistory = { history_id: number; reservation_id: number; changed_by?: string | null; status: ReservationStatus; changed_at: string; remarks?: string | null };
-export type CombinedBooking = { combined_booking_id: number; user_id: string; status: ReservationStatus; created_at: string; reservation?: Reservation[] };
+export type CombinedBooking = { combined_booking_id: number; user_id: string; status: ReservationStatus; created_at: string; user?: User | null; reservation?: Reservation[] };
 export type Media = { media_id: number; image_type: "JPG" | "PNG" | "WEBP"; file_size: number; storage_path: string; is_primary: boolean; display_order: number; created_at: string; url: string };
 export type ApiError = Error & { status?: number };
