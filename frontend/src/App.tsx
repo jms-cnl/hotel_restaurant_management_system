@@ -334,22 +334,23 @@ function Reservations({ manageView = false }: { manageView?: boolean } = {}) {
                     const isHotel = item.reservation_type === "HOTEL";
                     const start = isHotel ? item.check_in_date : item.reservation_date;
                     const end = isHotel ? item.check_out_date : item.end_time;
+                    const nights = isHotel && item.check_in_date && item.check_out_date ? Math.ceil((Date.parse(item.check_out_date) - Date.parse(item.check_in_date)) / 86400000) : null;
                     const nightlyRate = isHotel && room?.price_per_night != null ? `₱${Number(room.price_per_night).toLocaleString("en-PH")} / night` : null;
+                    const guestName = item.user ? `${item.user.first_name} ${item.user.last_name}` : "—";
                     return <article className="reservation-card" key={item.reservation_id}>
                         <div className="reservation-image-placeholder">{isHotel ? "Stay" : "Dining"}</div>
                         <div className="reservation-details">
                             <div className="reservation-card-heading">
-                                <div><h2>{hotel?.name ?? restaurant?.name ?? (isHotel ? `Room ${room?.room_number ?? "—"}` : `Table ${table?.table_number ?? "—"}`)}</h2><p>{hotel?.address ?? restaurant?.address ?? ""}</p></div>
+                                <div><h2>{hotel?.name ?? restaurant?.name ?? (isHotel ? `Room ${room?.room_number ?? "—"}` : `Table ${table?.table_number ?? "—"}`)}</h2><p>Guest: {guestName}</p><p>{isHotel ? `${room?.room_type ?? ""}${room ? ` · Room ${room.room_number}` : ""}` : table ? `Table ${table.table_number}` : ""}{(hotel?.address ?? restaurant?.address) ? ` · ${hotel?.address ?? restaurant?.address}` : ""}</p></div>
                                 <span className={`reservation-status ${item.status.toLowerCase()}`}>{item.status}</span>
                             </div>
                             <div className="reservation-meta">
                                 <div><span>{isHotel ? "CHECK-IN" : "DATE"}</span><strong>{start?.slice(0, 10) ?? "—"}</strong></div>
                                 <div><span>{isHotel ? "CHECK-OUT" : "TIME"}</span><strong>{isHotel ? end?.slice(0, 10) ?? "—" : item.start_time && item.end_time ? `${item.start_time}–${item.end_time}` : "—"}</strong></div>
-                                <div><span>{isHotel ? "ROOM" : "TABLE"}</span><strong>{isHotel ? room?.room_type ?? room?.room_number ?? "—" : table?.table_number ?? "—"}</strong></div>
-                                {nightlyRate && <div><span>NIGHTLY RATE</span><strong>{nightlyRate}</strong></div>}
+                                <div><span>{isHotel ? "DURATION" : "TABLE"}</span><strong>{isHotel ? nights === null ? "—" : `${nights} nights` : table?.table_number ?? "—"}</strong></div>
                             </div>
                             <div className="reservation-card-footer">
-                                <div className="reservation-price">{item.user ? `${item.user.first_name} ${item.user.last_name}` : "—"}</div>
+                                {nightlyRate ? <strong className="reservation-price">{nightlyRate}</strong> : <span />}
                                 <div>
                                     <button type="button" className="combined-stay-button" onClick={() => show(item)}>Details</button>
                                     {manager && item.status === "Pending" && <button type="button" className="combined-stay-button" onClick={() => status(item, "Confirmed")}>Confirm</button>}
