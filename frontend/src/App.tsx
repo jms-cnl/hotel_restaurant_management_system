@@ -17,6 +17,7 @@ import type { CombinedBooking, Hotel, Media, Reservation, ReservationHistory, Re
 const role = (user: User | null) => user?.role?.role_name ?? "Customer";
 const isManager = (user: User | null) => ["Admin", "Staff"].includes(role(user));
 const isAdmin = (user: User | null) => role(user) === "Admin";
+const userName = (user: User | null) => [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim() || user?.email || "Staff Member";
 const canCreateReservations = (user: User | null) => ["Customer", "Staff", "Admin"].includes(role(user));
 const landingPath = (user: User | null) => isManager(user) ? "/dashboard" : "/home";
 
@@ -35,7 +36,7 @@ function AppLayout({ children }: { children: ReactNode }) {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     if (!isManager(user)) return <CustomerLayout>{children}</CustomerLayout>;
-    const staffName = `${user?.first_name ?? ""} ${user?.last_name ?? ""}`.trim();
+    const staffName = userName(user);
     return <div className="manager-app customer-app">
         <header className="customer-navbar">
             <Link to="/dashboard" className="customer-logo">
@@ -44,21 +45,23 @@ function AppLayout({ children }: { children: ReactNode }) {
             </Link>
             <nav className="customer-nav-links">
                 <NavLink to="/dashboard">Dashboard</NavLink>
-                <NavLink to="/hotels">Hotels &amp; Restaurants</NavLink>
+                <NavLink to="/properties">Hotels &amp; Restaurants</NavLink>
                 <NavLink to="/reservations">Reservations</NavLink>
                 <NavLink to="/manage">Manage</NavLink>
-                <NavLink to="/restaurants">Restaurants</NavLink>
-                <NavLink to="/rooms">Rooms</NavLink>
-                <NavLink to="/tables">Tables</NavLink>
-                <NavLink to="/combined-bookings">Combined Bookings</NavLink>
-                <NavLink to="/reports">Reports</NavLink>
-                <NavLink to="/notifications">Notifications</NavLink>
-                {isAdmin(user) && <NavLink to="/users">Users</NavLink>}
+                {isAdmin(user) && <>
+                    <NavLink to="/hotels">Hotels</NavLink>
+                    <NavLink to="/restaurants">Restaurants</NavLink>
+                    <NavLink to="/rooms">Rooms</NavLink>
+                    <NavLink to="/tables">Tables</NavLink>
+                    <NavLink to="/reports">Reports</NavLink>
+                    <NavLink to="/users">Users</NavLink>
+                </>}
             </nav>
             <div className="customer-nav-actions">
                 <NavLink to="/profile" className="customer-profile-link">
                     {staffName}<span className="staff-role-label">{role(user)}</span>
                 </NavLink>
+                <NavLink to="/notifications" className="customer-profile-link">Notifications</NavLink>
                 <NavLink to="/profile" className="customer-profile-link">My Profile</NavLink>
                 <button type="button" className="customer-signout-button" onClick={async () => { await logout(); navigate("/login"); }}>
                     Sign Out
@@ -128,7 +131,7 @@ function Dashboard() {
             <div>
                 <p className="eyebrow">STAFF WORKSPACE</p>
                 <h1>Dashboard</h1>
-                <p className="staff-manage-description">Welcome, {`${user?.first_name ?? ""} ${user?.last_name ?? ""}`.trim()}. Here's what's happening across your properties.</p>
+                <p className="staff-manage-description">Welcome, {userName(user)}. Here's what's happening across your properties.</p>
             </div>
             <span className="staff-dashboard-badge">{role(user)}</span>
         </div>

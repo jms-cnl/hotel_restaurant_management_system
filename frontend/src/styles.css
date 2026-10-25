@@ -309,3 +309,27 @@ th { background: #e5e7eb; }
 .requirement-met { color: #166534; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 640px) { .topbar { flex-wrap: wrap; } .topbar .brand { width: 100%; } .content { padding: .8rem; } }
+
+.manager-app .customer-navbar {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+.manager-app .customer-logo,
+.manager-app .customer-nav-links,
+.manager-app .customer-nav-actions {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+.manager-app .customer-nav-links a,
+.manager-app .customer-nav-actions a {
+  text-decoration: none;
+  white-space: nowrap;
+}
+@media (max-width: 850px) {
+  .manager-app .customer-nav-links {
+    order: initial;
+    width: auto;
+    justify-content: flex-start;
+  }
+}
