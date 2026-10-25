@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, NavLink, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut, apiUpload, setToken } from "./api";
 import { useAuth } from "./auth";
 import { CustomerHome } from "./components/CustomerHome";
@@ -35,13 +35,37 @@ function AppLayout({ children }: { children: ReactNode }) {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     if (!isManager(user)) return <CustomerLayout>{children}</CustomerLayout>;
-    const links = role(user) === "Customer"
-        ? [["Home", "/home"], ["Hotels", "/hotels"], ["Restaurants", "/restaurants"], ["My Reservations", "/reservations"], ["My Combined Bookings", "/combined-bookings"], ["Notifications", "/notifications"], ["Profile", "/profile"]]
-        : [["Dashboard", "/dashboard"], ["Hotels", "/hotels"], ["Restaurants", "/restaurants"], ["Rooms", "/rooms"], ["Tables", "/tables"], ["Reservations", "/reservations"], ["Combined Bookings", "/combined-bookings"], ["Reports", "/reports"], ...(isAdmin(user) ? [["Users", "/users"]] : []), ["Notifications", "/notifications"], ["Profile", "/profile"]];
-    return <div className="app-shell manager-app">
-        <header className="manager-topbar"><Link className="manager-brand" to={landingPath(user)}>HRM reservations</Link><span className="manager-identity">{user?.first_name} {user?.last_name} ({role(user)})</span><button className="manager-signout" onClick={async () => { await logout(); navigate("/login"); }}>Log out</button></header>
-        <nav className="manager-nav" aria-label="Manager navigation">{links.map(([label, path]) => <Link key={path} to={path}>{label}</Link>)}</nav>
-        <main className="manager-content">{children}</main>
+    const staffName = `${user?.first_name ?? ""} ${user?.last_name ?? ""}`.trim();
+    return <div className="manager-app customer-app">
+        <header className="customer-navbar">
+            <Link to="/dashboard" className="customer-logo">
+                <span className="customer-logo-icon">L</span>
+                <span>StayEase</span>
+            </Link>
+            <nav className="customer-nav-links">
+                <NavLink to="/dashboard">Dashboard</NavLink>
+                <NavLink to="/hotels">Hotels &amp; Restaurants</NavLink>
+                <NavLink to="/reservations">Reservations</NavLink>
+                <NavLink to="/manage">Manage</NavLink>
+                <NavLink to="/restaurants">Restaurants</NavLink>
+                <NavLink to="/rooms">Rooms</NavLink>
+                <NavLink to="/tables">Tables</NavLink>
+                <NavLink to="/combined-bookings">Combined Bookings</NavLink>
+                <NavLink to="/reports">Reports</NavLink>
+                <NavLink to="/notifications">Notifications</NavLink>
+                {isAdmin(user) && <NavLink to="/users">Users</NavLink>}
+            </nav>
+            <div className="customer-nav-actions">
+                <NavLink to="/profile" className="customer-profile-link">
+                    {staffName}<span className="staff-role-label">{role(user)}</span>
+                </NavLink>
+                <NavLink to="/profile" className="customer-profile-link">My Profile</NavLink>
+                <button type="button" className="customer-signout-button" onClick={async () => { await logout(); navigate("/login"); }}>
+                    Sign Out
+                </button>
+            </div>
+        </header>
+        <main className="customer-main">{children}</main>
     </div>;
 }
 
