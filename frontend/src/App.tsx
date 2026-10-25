@@ -111,35 +111,49 @@ function AuthPage({ registerMode = false }: { registerMode?: boolean }) {
 }
 
 function Dashboard() {
+    const { user } = useAuth();
     const [data, setData] = useState<Record<string, number> | null>(null); const [error, setError] = useState("");
     useEffect(() => { apiGet<Record<string, number>>("/dashboard").then(setData).catch(e => setError(e.message)); }, []);
-    return <Page title="Dashboard" error={error}>{data ? <section className="manager-dashboard">
-        <div className="manager-dashboard-stats">
-            {[
-                { label: "Hotels", value: data.hotels },
-                { label: "Restaurants", value: data.restaurants },
-                { label: "Rooms", value: data.rooms, detail: `${data.availableRooms} available` },
-                { label: "Tables", value: data.tables, detail: `${data.availableTables} available` },
-                { label: "Reservations", value: data.reservations },
-                { label: "Combined bookings", value: data.combinedBookings, detail: `${data.completedCombinedBookings} completed` },
-                { label: "Notifications", value: data.notifications, detail: `${data.unreadNotifications} unread` }
-            ].map(item => <article className="manager-dashboard-stat" key={item.label}>
-                <span>{item.label}</span><strong>{item.value}</strong>{item.detail && <small>{item.detail}</small>}
-            </article>)}
+    if (!data) return <Page title="Dashboard" error={error} loading={!error}>{null}</Page>;
+    const occupiedRooms = Math.max(0, data.rooms - data.availableRooms);
+    const occupancy = data.rooms > 0 ? Math.round((occupiedRooms / data.rooms) * 100) : 0;
+    const statusCounts = [
+        { label: "Confirmed", count: data.confirmedReservations, className: "confirmed" },
+        { label: "Pending", count: data.pendingReservations, className: "pending" },
+        { label: "Cancelled", count: data.cancelledReservations, className: "cancelled" }
+    ];
+    const statusTotal = statusCounts.reduce((total, item) => total + item.count, 0);
+    return <section className="listing-section staff-dashboard-page">
+        <div className="staff-dashboard-heading">
+            <div>
+                <p className="eyebrow">STAFF WORKSPACE</p>
+                <h1>Dashboard</h1>
+                <p className="staff-manage-description">Welcome, {`${user?.first_name ?? ""} ${user?.last_name ?? ""}`.trim()}. Here's what's happening across your properties.</p>
+            </div>
+            <span className="staff-dashboard-badge">{role(user)}</span>
         </div>
-        <section className="manager-dashboard-panel">
-            <h2>Reservation status counts</h2>
-            <div className="manager-dashboard-status-list">
-                {[
-                    { label: "Confirmed", value: data.confirmedReservations },
-                    { label: "Pending", value: data.pendingReservations },
-                    { label: "Cancelled", value: data.cancelledReservations }
-                ].map(item => <div className="manager-dashboard-status-item" key={item.label}>
-                    <span>{item.label}</span><strong>{item.value}</strong>
-                </div>)}
+        <div className="staff-dashboard-stats">
+            <article className="staff-dashboard-stat">
+                <p>ROOM OCCUPANCY</p>
+                <span className="staff-stat-icon">📊</span>
+                <strong className="orange-stat">{occupancy}%</strong>
+                <small>{occupiedRooms}/{data.rooms} rooms occupied</small>
+            </article>
+        </div>
+        <section className="staff-dashboard-panel">
+            <h2>Reservation Status Breakdown</h2>
+            <div className="staff-status-breakdown">
+                {statusCounts.map(item => {
+                    const percentage = statusTotal ? Math.round((item.count / statusTotal) * 100) : 0;
+                    return <div className="staff-status-item" key={item.label}>
+                        <div className="staff-status-label"><span>{item.label}</span><strong>{item.count}</strong></div>
+                        <div className="staff-status-track"><span className={item.className} style={{ width: `${percentage}%` }} /></div>
+                        <small>{percentage}%</small>
+                    </div>;
+                })}
             </div>
         </section>
-    </section> : !error && <p>Loading...</p>}</Page>;
+    </section>;
 }
 
 function Home() {
