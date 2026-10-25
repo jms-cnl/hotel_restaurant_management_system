@@ -153,43 +153,6 @@ a {
   margin: 28px auto 0;
 }
 
-/* Keep the original initial search-bar declarations.
-   The later search-bar rules below intentionally override them. */
-
-.search-bar {
-  max-width: 1050px;
-  margin: 0 auto;
-  padding: 15px;
-  display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr auto;
-  align-items: end;
-  gap: 15px;
-  text-align: left;
-  background: #ffffff;
-  border-radius: 14px;
-  box-shadow: 0 18px 55px #00000026;
-}
-
-.search-bar label {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  color: #343b48;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.search-bar input {
-  width: 100%;
-  min-width: 0;
-  padding: 10px 8px;
-  color: #202938;
-  background: #f8f9fb;
-  border: 1px solid #e4e7ec;
-  border-radius: 7px;
-  outline-color: #bba06d;
-}
-
 /* Effective search-bar appearance from the later declarations */
 
 .search-bar {
@@ -1027,7 +990,7 @@ a {
   display: block;
   width: 100%;
   margin-top: 18px;
-  padding: 13px 16px;
+  padding: 9px 13px;
   border: 0;
   border-radius: 9px;
   background: #e4bd70;
@@ -1227,7 +1190,7 @@ a {
 
 .booking-submit-button {
   width: 100%;
-  padding: 13px 16px;
+  padding: 9px 13px;
   border: 0;
   border-radius: 7px;
   background: #d9ad48;
@@ -2432,5 +2395,576 @@ a {
     flex: 1;
     padding: 10px 7px;
     font-size: 0.68rem;
+  }
+}
+
+
+/* Staff reservation management */
+.staff-manage-page {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 20px clamp(12px, 2vw, 28px);
+  color: #f8f7f4;
+}
+
+.staff-manage-description {
+  color: #c7ced9;
+  margin-bottom: 24px;
+}
+
+.staff-manage-filters,
+.staff-reservation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.staff-filter-button,
+.staff-secondary-button,
+.staff-delete-button {
+  border: 1px solid #48546a;
+  border-radius: 8px;
+  padding: 10px 15px;
+  background: #151f32;
+  color: #f8f7f4;
+  cursor: pointer;
+  font: inherit;
+}
+
+.staff-filter-button.active {
+  background: #e4bd70;
+  border-color: #e4bd70;
+  color: #101827;
+}
+
+.staff-reservation-list {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.staff-reservation-card,
+.staff-manage-panel {
+  background: #111c2e;
+  border: 1px solid #344158;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 18px;
+}
+
+.staff-reservation-info h3,
+.staff-manage-panel h2 {
+  color: #e7c99a;
+}
+
+.staff-reservation-info p,
+.staff-manage-panel p {
+  color: #e3e7ee;
+  overflow-wrap: anywhere;
+}
+
+.staff-secondary-button:hover,
+.staff-filter-button:hover {
+  border-color: #e4bd70;
+}
+
+.staff-delete-button {
+  border-color: #9b4d50;
+  color: #ffb9b9;
+}
+
+.staff-delete-button:hover {
+  background: #46252d;
+}
+
+.staff-edit-form {
+  display: grid;
+  gap: 14px;
+  max-width: 600px;
+}
+
+.staff-edit-form label {
+  display: grid;
+  gap: 7px;
+  color: #e7c99a;
+}
+
+.staff-edit-form input,
+.staff-edit-form select,
+.staff-edit-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #48546a;
+  border-radius: 7px;
+  padding: 11px;
+  background: #0b1428;
+  color: #f8f7f4;
+  font: inherit;
+}
+
+.staff-edit-form textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+@media (max-width: 650px) {
+  .staff-reservation-card {
+    padding: 15px;
+  }
+
+  .staff-reservation-actions {
+    flex-direction: column;
+  }
+
+  .staff-reservation-actions button {
+    width: 100%;
+  }
+}
+
+.staff-role-label {
+  display: block;
+  font-size: 0.7rem;
+  opacity: 0.75;
+}
+
+
+/* Staff dashboard */
+.staff-dashboard-page {
+  color: #f8f7f4;
+}
+
+.staff-dashboard-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+.staff-dashboard-heading h1 {
+  margin-bottom: 8px;
+}
+
+.staff-dashboard-badge {
+  border: 1px solid #574b30;
+  border-radius: 20px;
+  padding: 7px 14px;
+  color: #e7c99a;
+  background: #242536;
+  font-size: 0.8rem;
+}
+
+.staff-dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  max-width: 850px;
+  margin-bottom: 24px;
+}
+
+.staff-dashboard-stat {
+  position: relative;
+  min-height: 100px;
+  padding: 18px;
+  border: 1px solid #344158;
+  border-radius: 12px;
+  background: #1e2d3d;
+}
+
+.staff-dashboard-stat p {
+  color: #a9b7c8;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  margin: 0 0 20px;
+}
+
+.staff-stat-icon {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+}
+
+.staff-dashboard-stat strong {
+  display: block;
+  color: #65c69a;
+  font-size: 1.5rem;
+}
+
+.staff-dashboard-stat strong.orange-stat {
+  color: #f19b6a;
+}
+
+.staff-dashboard-stat strong.gold-stat {
+  color: #e7c99a;
+}
+
+.staff-dashboard-stat small {
+  display: block;
+  color: #94a4b8;
+  margin-top: 5px;
+}
+
+.staff-dashboard-panel {
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid #344158;
+  border-radius: 12px;
+  background: #1e2d3d;
+}
+
+.staff-dashboard-panel h2 {
+  color: #f8f7f4;
+  font-size: 1.1rem;
+  margin: 0 0 18px;
+}
+
+.staff-activity-list {
+  display: grid;
+  gap: 13px;
+}
+
+.staff-activity-list article {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.staff-activity-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: #2c3d4e;
+}
+
+.staff-activity-list article > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.staff-activity-list strong {
+  color: #f8f7f4;
+  font-size: 0.85rem;
+}
+
+.staff-activity-list p {
+  margin: 3px 0 0;
+  color: #a9b7c8;
+  font-size: 0.78rem;
+}
+
+.staff-status {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.68rem;
+}
+
+.staff-status.confirmed {
+  color: #70d5a2;
+  background: #24483e;
+}
+
+.staff-status.pending {
+  color: #f1a36e;
+  background: #4a352d;
+}
+
+.staff-status-breakdown {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.staff-status-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: #b9c5d3;
+  font-size: 0.78rem;
+  margin-bottom: 8px;
+}
+
+.staff-status-label strong {
+  color: #f8f7f4;
+}
+
+.staff-status-track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: #111c2b;
+}
+
+.staff-status-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.staff-status-track .confirmed {
+  background: #65c69a;
+}
+
+.staff-status-track .pending {
+  background: #f19b6a;
+}
+
+.staff-status-track .cancelled {
+  background: #e36b72;
+}
+
+.staff-status-track .completed {
+  background: #8fa8c4;
+}
+
+.staff-status-item small {
+  display: block;
+  margin-top: 5px;
+  color: #94a4b8;
+}
+
+@media (max-width: 700px) {
+  .staff-dashboard-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-status-breakdown {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .staff-dashboard-heading {
+    flex-direction: column;
+  }
+}
+
+
+/* Staff Manage: reservation tabs, toolbar, and table */
+.staff-manage-page {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 20px clamp(12px, 2vw, 28px);
+  box-sizing: border-box;
+}
+
+.staff-manage-page *,
+.staff-manage-page *::before,
+.staff-manage-page *::after {
+  box-sizing: border-box;
+}
+
+.staff-manage-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 0 16px;
+  border-bottom: 1px solid #344158;
+}
+
+.staff-manage-tab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 13px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #aebbc9;
+  cursor: pointer;
+  font: inherit;
+}
+
+.staff-manage-tab.active {
+  color: #e7c99a;
+  border-bottom-color: #e7c99a;
+}
+
+.staff-manage-tab span {
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #2a374a;
+  color: #f8f7f4;
+  font-size: 0.75rem;
+}
+
+.staff-manage-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+  color: #aebbc9;
+  font-size: 0.85rem;
+}
+
+.staff-manage-toolbar input {
+  flex: 1 1 320px;
+  width: 100%;
+  max-width: 440px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid #344158;
+  border-radius: 8px;
+  background: #111c2e;
+  color: #f8f7f4;
+  font: inherit;
+}
+
+.staff-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid #344158;
+  border-radius: 12px;
+  background: #111c2e;
+}
+
+.staff-reservations-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: auto;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.8rem;
+}
+
+.staff-reservations-table th {
+  padding: 12px 8px;
+  background: #1e2d3d;
+  color: #c6d0dd;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: normal;
+}
+
+.staff-reservations-table td {
+  padding: 12px 8px;
+  border-top: 1px solid #29384b;
+  color: #edf0f5;
+  font-size: 0.82rem;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.staff-reservations-table td strong,
+.staff-reservations-table td small {
+  display: block;
+}
+
+.staff-reservations-table td small {
+  margin-top: 5px;
+  color: #9cabbc;
+  font-size: 0.75rem;
+}
+
+.staff-reservations-table td:last-child {
+  min-width: 220px;
+  overflow-wrap: normal;
+}
+
+.staff-status-select {
+  width: 100%;
+  max-width: 130px;
+  padding: 7px 9px;
+  border: 1px solid #48546a;
+  border-radius: 7px;
+  background: #172438;
+  color: #f8f7f4;
+}
+
+.staff-status-select.confirmed {
+  border-color: #377b61;
+}
+
+.staff-status-select.pending {
+  border-color: #98613b;
+}
+
+.staff-status-select.cancelled {
+  border-color: #9b4d50;
+}
+
+.staff-status-select.completed {
+  border-color: #657d99;
+}
+
+.staff-table-actions {
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+
+.staff-table-actions button {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border: 1px solid #48546a;
+  border-radius: 7px;
+  background: #1e2d3d;
+  color: #f8f7f4;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.staff-table-actions button:hover {
+  background: #2a374a;
+  border-color: #e7c99a;
+}
+
+.staff-table-actions button.delete {
+  background: transparent;
+  color: #ffb9b9;
+  border-color: #774448;
+}
+
+.staff-table-actions button.delete:hover {
+  background: #3a252d;
+  border-color: #c66b72;
+}
+
+
+.staff-empty-state {
+  padding: 30px !important;
+  text-align: center;
+  color: #aebbc9 !important;
+}
+
+@media (max-width: 900px) {
+  .staff-reservations-table th,
+  .staff-reservations-table td {
+    padding: 9px 6px;
+  }
+
+  .staff-table-actions {
+    gap: 4px;
+  }
+
+  .staff-table-actions button {
+    padding: 7px 8px;
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 650px) {
+  .staff-manage-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .staff-manage-toolbar input {
+    flex: 1 1 auto;
+    max-width: none;
   }
 }
