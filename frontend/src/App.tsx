@@ -89,7 +89,33 @@ function AuthPage({ registerMode = false }: { registerMode?: boolean }) {
 function Dashboard() {
     const [data, setData] = useState<Record<string, number> | null>(null); const [error, setError] = useState("");
     useEffect(() => { apiGet<Record<string, number>>("/dashboard").then(setData).catch(e => setError(e.message)); }, []);
-    return <Page title="Dashboard" error={error}>{data ? <div className="stat-grid">{Object.entries(data).map(([key, value]) => <div className="stat" key={key}><strong>{value}</strong><span>{key}</span></div>)}</div> : !error && <p>Loading...</p>}</Page>;
+    return <Page title="Dashboard" error={error}>{data ? <section className="manager-dashboard">
+        <div className="manager-dashboard-stats">
+            {[
+                { label: "Hotels", value: data.hotels },
+                { label: "Restaurants", value: data.restaurants },
+                { label: "Rooms", value: data.rooms, detail: `${data.availableRooms} available` },
+                { label: "Tables", value: data.tables, detail: `${data.availableTables} available` },
+                { label: "Reservations", value: data.reservations },
+                { label: "Combined bookings", value: data.combinedBookings, detail: `${data.completedCombinedBookings} completed` },
+                { label: "Notifications", value: data.notifications, detail: `${data.unreadNotifications} unread` }
+            ].map(item => <article className="manager-dashboard-stat" key={item.label}>
+                <span>{item.label}</span><strong>{item.value}</strong>{item.detail && <small>{item.detail}</small>}
+            </article>)}
+        </div>
+        <section className="manager-dashboard-panel">
+            <h2>Reservation status counts</h2>
+            <div className="manager-dashboard-status-list">
+                {[
+                    { label: "Confirmed", value: data.confirmedReservations },
+                    { label: "Pending", value: data.pendingReservations },
+                    { label: "Cancelled", value: data.cancelledReservations }
+                ].map(item => <div className="manager-dashboard-status-item" key={item.label}>
+                    <span>{item.label}</span><strong>{item.value}</strong>
+                </div>)}
+            </div>
+        </section>
+    </section> : !error && <p>Loading...</p>}</Page>;
 }
 
 function Home() {
