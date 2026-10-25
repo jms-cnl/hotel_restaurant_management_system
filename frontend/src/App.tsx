@@ -395,18 +395,72 @@ function ResourcePage({ kind }: { kind: keyof typeof mediaEntityTypes }) {
     return <Page title={config.title} error={error} loading={loading}><div className="toolbar">{config.search && <input placeholder="Search" value={filter} onChange={e => setFilter(e.target.value)} />}</div><div className="table-wrap"><table><thead><tr>{config.fields.map(field => <th key={field}>{field}</th>)}<th>Media</th>{manager && <th>Actions</th>}</tr></thead><tbody>{items.map(item => <tr key={String(item[config.id])}>{config.fields.map(field => <td key={field}>{String(item[field] ?? "")}</td>)}<td><button onClick={() => setMediaEntity(Number(item[config.id]))}>View images</button></td>{manager && <td><button onClick={() => { setEditing(Number(item[config.id])); setForm(Object.fromEntries(config.fields.map(field => [field, String(item[field] ?? "")]))); }}>Edit</button> <button onClick={() => remove(Number(item[config.id]))}>Delete</button></td>}</tr>)}</tbody></table>{!items.length && <p className="empty">No records found.</p>}</div>{mediaEntity !== null && <MediaManager entityType={kind} entityId={mediaEntity} manager={manager} />}{manager && <form className="form-panel inline-form" onSubmit={submit}><h2>{editing ? `Edit ${config.title.slice(0, -1)}` : `Add ${config.title.slice(0, -1)}`}</h2>{config.fields.map(field => <label key={field}>{field}<input required={!field.includes("description") && field !== "email"} value={form[field] ?? ""} onChange={e => setForm({ ...form, [field]: e.target.value })} /></label>)}<button type="submit">Save</button>{editing && <button type="button" onClick={() => { setEditing(null); setForm({}); }}>Cancel</button>}</form>}</Page>;
 }
 
+function CombinedStayWizard({ user, onCreated }: { user: User | null; onCreated: () => void }) {
+    const [rooms, setRooms] = useState<Room[]>([]); const [tables, setTables] = useState<RestaurantTable[]>([]); const [error, setError] = useState(""); const [message, setMessage] = useState(""); const [step, setStep] = useState(1); const [inventoryLoading, setInventoryLoading] = useState(true); const [selectedHotelId, setSelectedHotelId] = useState(""); const [selectedRestaurantId, setSelectedRestaurantId] = useState(""); const [form, setForm] = useState({ room_id: "", check_in_date: "", check_out_date: "", table_id: "", reservation_date: "", start_time: "", end_time: "" });
+    useEffect(() => { Promise.all([apiGet<Room[]>("/rooms"), apiGet<RestaurantTable[]>("/tables")]).then(([roomData, tableData]) => { setRooms(roomData); setTables(tableData); if (roomData[0]) setSelectedHotelId(String(roomData[0].hotel_id)); if (tableData[0]) setSelectedRestaurantId(String(tableData[0].restaurant_id)); }).catch(() => undefined).finally(() => setInventoryLoading(false)); }, []);
+    const submit = async (event: FormEvent) => { event.preventDefault(); setError(""); setMessage(""); try { await apiPost("/combined-bookings/hotel-restaurant", buildCombinedBookingPayload({ roomId: Number(form.room_id), checkIn: form.check_in_date, checkOut: form.check_out_date, tableId: Number(form.table_id), date: form.reservation_date, startTime: form.start_time, endTime: form.end_time })); setMessage("Combined booking created"); onCreated(); setStep(1); } catch (e) { setError(e instanceof Error ? e.message : "Combined booking failed"); } };
+    const hotelIds = Array.from(new Set(rooms.map(room => room.hotel_id)));
+    const restaurantIds = Array.from(new Set(tables.map(table => table.restaurant_id)));
+    const hotelRooms = rooms.filter(room => String(room.hotel_id) === selectedHotelId);
+    const restaurantTables = tables.filter(table => String(table.restaurant_id) === selectedRestaurantId);
+    const selectedRoom = rooms.find(room => String(room.room_id) === form.room_id);
+    const selectedTable = tables.find(table => String(table.table_id) === form.table_id);
+    const selectedHotel = selectedRoom?.hotel;
+    const selectedRestaurant = selectedTable?.restaurant;
+    const advance = () => {
+        setError("");
+        if (step === 1 && (!form.room_id || !form.check_in_date || !form.check_out_date)) { setError("Choose a room and enter check-in and check-out dates."); return; }
+        if (step === 2 && (!form.table_id || !form.reservation_date || !form.start_time || !form.end_time)) { setError("Choose a table and enter the dining date, start time, and end time."); return; }
+        setStep(value => Math.min(3, value + 1));
+    };
+    return <section className="combined-wizard">
+        <div className="combined-wizard-container">
+            <header className="combined-wizard-header"><p className="eyebrow">YOUR COMPLETE GETAWAY</p><h1>Plan Your Complete Stay</h1><p>Select a room, then choose a table and dining time.</p></header>
+            {message && <p className="alert success" role="status">{message}</p>}{error && <p className="combined-error" role="alert">{error}</p>}
+            {inventoryLoading && <p>Loading rooms and tables...</p>}
+            <div className="combined-steps">{[{ number: 1, label: "Hotel & Room" }, { number: 2, label: "Restaurant" }, { number: 3, label: "Review" }].map(item => <div key={item.number} className={`combined-step ${step === item.number ? "active" : ""} ${step > item.number ? "completed" : ""}`}><span>{step > item.number ? "✓" : item.number}</span><small>{item.label}</small></div>)}</div>
+            <form className="combined-wizard-form" onSubmit={submit}>
+                {step === 1 && <>
+                    <p className="eyebrow">CHOOSE YOUR HOTEL</p>
+                    <div className="combined-hotel-grid">{hotelIds.map(hotelId => { const hotel = rooms.find(room => room.hotel_id === hotelId)?.hotel; return <button type="button" key={hotelId} className={`combined-hotel-card ${selectedHotelId === String(hotelId) ? "selected" : ""}`} onClick={() => { setSelectedHotelId(String(hotelId)); setForm({ ...form, room_id: "" }); }} aria-pressed={selectedHotelId === String(hotelId)}><span className="combined-card-copy"><strong>{hotel?.name ?? `Hotel #${hotelId}`}</strong><small>{hotel?.address ?? ""}</small></span></button>; })}</div>
+                    <p className="eyebrow combined-section-label">SELECT A ROOM</p>
+                    <div className="combined-room-list">{hotelRooms.map(room => <label key={room.room_id} className={`combined-room-option ${form.room_id === String(room.room_id) ? "selected" : ""}`}><input type="radio" name="room" value={room.room_id} checked={form.room_id === String(room.room_id)} onChange={() => setForm({ ...form, room_id: String(room.room_id) })} /><span className="combined-room-copy"><strong>{room.room_type} · Room {room.room_number}</strong><small>{room.status} · Capacity {room.capacity}</small></span><strong className="combined-room-price">₱{Number(room.price_per_night).toLocaleString("en-PH")}<small>/ night</small></strong></label>)}</div>
+                    <div className="combined-fields"><p className="eyebrow">DATES</p><div className="combined-field-grid"><label>Check-in<input type="date" value={form.check_in_date} onChange={event => setForm({ ...form, check_in_date: event.target.value })} required /></label><label>Check-out<input type="date" min={form.check_in_date || undefined} value={form.check_out_date} onChange={event => setForm({ ...form, check_out_date: event.target.value })} required /></label></div></div>
+                </>}
+                {step === 2 && <>
+                    <p className="eyebrow">CHOOSE YOUR RESTAURANT</p>
+                    <div className="combined-hotel-grid">{restaurantIds.map(restaurantId => { const restaurant = tables.find(table => table.restaurant_id === restaurantId)?.restaurant; return <button type="button" key={restaurantId} className={`combined-hotel-card ${selectedRestaurantId === String(restaurantId) ? "selected" : ""}`} onClick={() => { setSelectedRestaurantId(String(restaurantId)); setForm({ ...form, table_id: "" }); }} aria-pressed={selectedRestaurantId === String(restaurantId)}><span className="combined-card-copy"><strong>{restaurant?.name ?? `Restaurant #${restaurantId}`}</strong><small>{restaurant?.address ?? ""}</small></span></button>; })}</div>
+                    <p className="eyebrow combined-section-label">SELECT A TABLE</p>
+                    <div className="combined-room-list">{restaurantTables.map(table => <label key={table.table_id} className={`combined-room-option ${form.table_id === String(table.table_id) ? "selected" : ""}`}><input type="radio" name="table" value={table.table_id} checked={form.table_id === String(table.table_id)} onChange={() => setForm({ ...form, table_id: String(table.table_id) })} /><span className="combined-room-copy"><strong>Table {table.table_number}</strong><small>{table.status} · Capacity {table.capacity}</small></span></label>)}</div>
+                    <div className="combined-fields"><p className="eyebrow">DINING DETAILS</p><div className="combined-field-grid"><label>Dining date<input type="date" min={form.check_in_date || undefined} max={form.check_out_date || undefined} value={form.reservation_date} onChange={event => setForm({ ...form, reservation_date: event.target.value })} required /></label><label>Preferred time<input type="time" value={form.start_time} onChange={event => setForm({ ...form, start_time: event.target.value })} required /></label><label>End time<input type="time" value={form.end_time} onChange={event => setForm({ ...form, end_time: event.target.value })} required /></label></div></div>
+                </>}
+                {step === 3 && <><p className="eyebrow">CHECK YOUR SELECTIONS</p><h2 className="combined-review-title">Review Your Complete Stay</h2><div className="combined-review-card"><h3>Hotel &amp; Room</h3><p>{selectedHotel?.name ?? (selectedRoom ? `Hotel #${selectedRoom.hotel_id}` : "—")}</p><p>{selectedRoom?.room_type} · Room {selectedRoom?.room_number}</p><p>{form.check_in_date} → {form.check_out_date}</p>{selectedRoom && <strong>₱{Number(selectedRoom.price_per_night).toLocaleString("en-PH")}<small> per night</small></strong>}</div><div className="combined-review-card"><h3>Dining Reservation</h3><p>{selectedRestaurant?.name ?? (selectedTable ? `Restaurant #${selectedTable.restaurant_id}` : "—")}</p><p>Table {selectedTable?.table_number}</p><p>{form.reservation_date} · {form.start_time}–{form.end_time}</p></div></>}
+                <div className="combined-form-actions">{step > 1 && <button type="button" className="combined-secondary-button" onClick={() => { setError(""); setStep(value => value - 1); }}>Back</button>}{step < 3 ? <button type="button" className="combined-primary-button" onClick={advance}>Continue</button> : <button type="submit" className="combined-primary-button" disabled={!canCreateReservations(user)}>Create Combined Booking</button>}</div>
+            </form>
+        </div>
+    </section>;
+}
+
 function Reservations({ manageView = false }: { manageView?: boolean } = {}) {
-    const { user } = useAuth(); const navigate = useNavigate(); const manager = isManager(user); const [items, setItems] = useState<Reservation[]>([]); const [rooms, setRooms] = useState<Room[]>([]); const [tables, setTables] = useState<RestaurantTable[]>([]); const [selected, setSelected] = useState<Reservation | null>(null); const [history, setHistory] = useState<ReservationHistory[]>([]); const [type, setType] = useState("HOTEL"); const [statusFilter, setStatusFilter] = useState(""); const [category, setCategory] = useState<"Hotels" | "Dining">("Hotels"); const [manageType, setManageType] = useState<"Hotel" | "Restaurant">("Hotel"); const [search, setSearch] = useState(""); const [error, setError] = useState(""); const [message, setMessage] = useState("");
+    const { user } = useAuth(); const manager = isManager(user); const [items, setItems] = useState<Reservation[]>([]); const [combinedItems, setCombinedItems] = useState<CombinedBooking[]>([]); const [itemsLoading, setItemsLoading] = useState(true); const [combinedLoading, setCombinedLoading] = useState(true); const [rooms, setRooms] = useState<Room[]>([]); const [tables, setTables] = useState<RestaurantTable[]>([]); const [selected, setSelected] = useState<Reservation | null>(null); const [history, setHistory] = useState<ReservationHistory[]>([]); const [type, setType] = useState("HOTEL"); const [statusFilter, setStatusFilter] = useState(""); const [category, setCategory] = useState<"Hotels" | "Dining" | "Combined">("Hotels"); const [manageType, setManageType] = useState<"Hotel" | "Restaurant">("Hotel"); const [search, setSearch] = useState(""); const [error, setError] = useState(""); const [message, setMessage] = useState(""); const [showCombinedWizard, setShowCombinedWizard] = useState(false);
     const [form, setForm] = useState<Record<string, string>>({});
-    const load = () => apiGet<Reservation[]>(`/reservations${statusFilter ? `?status=${statusFilter}` : ""}`).then(setItems).catch(e => setError(e.message));
-    useEffect(() => { load(); apiGet<Room[]>("/rooms").then(setRooms).catch(() => undefined); apiGet<RestaurantTable[]>("/tables").then(setTables).catch(() => undefined); }, [statusFilter]);
+    const load = () => { setItemsLoading(true); apiGet<Reservation[]>(`/reservations${statusFilter ? `?status=${statusFilter}` : ""}`).then(setItems).catch(e => setError(e.message)).finally(() => setItemsLoading(false)); };
+    const loadCombined = () => { setCombinedLoading(true); apiGet<CombinedBooking[]>("/combined-bookings").then(setCombinedItems).catch(e => setError(e.message)).finally(() => setCombinedLoading(false)); };
+    useEffect(() => { load(); loadCombined(); apiGet<Room[]>("/rooms").then(setRooms).catch(() => undefined); apiGet<RestaurantTable[]>("/tables").then(setTables).catch(() => undefined); }, [statusFilter]);
     const submit = async (event: FormEvent) => { event.preventDefault(); setError(""); setMessage(""); try { await apiPost("/reservations", { ...form, reservation_type: type, room_id: type === "HOTEL" ? Number(form.room_id) : null, table_id: type === "RESTAURANT" ? Number(form.table_id) : null }); setForm({}); setMessage("Reservation created"); load(); } catch (e) { setError(e instanceof Error ? e.message : "Reservation failed"); } };
     const show = async (item: Reservation) => { setSelected(item); try { setHistory(await apiGet<ReservationHistory[]>(`/reservations/${item.reservation_id}/history`)); } catch (e) { setError(e instanceof Error ? e.message : "History failed"); } };
     const status = async (item: Reservation, next: string) => { try { await apiPatch(`/reservations/${item.reservation_id}/status`, { status: next }); setMessage("Status updated"); load(); } catch (e) { setError(e instanceof Error ? e.message : "Status update failed"); } };
+    const combinedStatus = async (item: CombinedBooking, next: string) => { try { await apiPatch(`/combined-bookings/${item.combined_booking_id}/status`, { status: next }); setMessage("Status updated"); loadCombined(); } catch (e) { setError(e instanceof Error ? e.message : "Status update failed"); } };
     const hotelCount = items.filter(item => item.reservation_type === "HOTEL").length;
     const diningCount = items.filter(item => item.reservation_type === "RESTAURANT").length;
-    const upcomingCount = items.filter(item => item.status === "Pending" || item.status === "Confirmed").length;
-    const displayed = items.filter(item => item.reservation_type === (category === "Hotels" ? "HOTEL" : "RESTAURANT"));
+    const today = new Date().toISOString().slice(0, 10);
+    const isUpcoming = (item: Reservation) => {
+        const date = item.reservation_type === "HOTEL" ? item.check_in_date : item.reservation_date;
+        return (item.status === "Pending" || item.status === "Confirmed") && Boolean(date && date.slice(0, 10) >= today);
+    };
+    const upcomingCount = items.filter(item => !item.combined_booking_id && isUpcoming(item)).length + combinedItems.filter(item => (item.status === "Pending" || item.status === "Confirmed") && item.reservation?.some(reservation => { const date = reservation.check_in_date ?? reservation.reservation_date; return Boolean(date && date.slice(0, 10) >= today); })).length;
+    const displayed = items.filter(item => item.reservation_type === (category === "Dining" ? "RESTAURANT" : "HOTEL"));
+    const displayedCombined = combinedItems.filter(item => !statusFilter || item.status === statusFilter);
     const managedItems = items.filter(item => item.reservation_type === (manageType === "Hotel" ? "HOTEL" : "RESTAURANT") && `${item.reservation_id} ${item.user?.first_name ?? ""} ${item.user?.last_name ?? ""} ${item.room?.hotel?.name ?? item.restaurant_table?.restaurant?.name ?? ""} ${item.room?.room_number ?? item.restaurant_table?.table_number ?? ""}`.toLowerCase().includes(search.toLowerCase()));
     if (manageView) return <section className="listing-section staff-manage-page">
         <p className="eyebrow">STAFF WORKSPACE</p>
@@ -448,25 +502,41 @@ function Reservations({ manageView = false }: { manageView?: boolean } = {}) {
         <section className="reservations-page">
             <div className="reservations-heading">
                 <div><h1>Reservations</h1><p>Manage and monitor all reservations here.</p></div>
-                <Link to="/combined-bookings" className="combined-stay-button">+ Plan a Combined Stay</Link>
+                <button type="button" className="combined-stay-button" onClick={() => setShowCombinedWizard(true)}>+ Plan a Combined Stay</button>
             </div>
             {message && <div className="alert success">{message}</div>}{error && <div className="alert error">{error}</div>}
+            {showCombinedWizard && <CombinedStayWizard user={user} onCreated={() => { loadCombined(); setMessage("Combined booking created"); setShowCombinedWizard(false); }} />}
             <div className="reservation-stats">
                 <div className="stat-card"><span>Hotel Bookings</span><strong>{hotelCount}</strong></div>
                 <div className="stat-card"><span>Dining Reservations</span><strong>{diningCount}</strong></div>
+                <div className="stat-card"><span>Combined Stays</span><strong>{combinedItems.length}</strong></div>
                 <div className="stat-card"><span>Upcoming</span><strong className="upcoming-number">{upcomingCount}</strong></div>
             </div>
             <div className="reservation-toolbar">
                 <div className="reservation-tabs">
-                    {(["Hotels", "Dining"] as const).map(item => <button key={item} type="button" className={category === item ? "active" : ""} onClick={() => setCategory(item)}>{item}</button>)}
-                    <button type="button" onClick={() => navigate("/combined-bookings")}>Combined</button>
+                    {(["Hotels", "Dining", "Combined"] as const).map(item => <button key={item} type="button" className={category === item ? "active" : ""} onClick={() => setCategory(item)}>{item}</button>)}
                 </div>
                 <select aria-label="Filter by reservation status" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
                     <option value="">All Statuses</option>{["Pending", "Confirmed", "Rejected", "Cancelled", "Completed"].map(value => <option key={value}>{value}</option>)}
                 </select>
             </div>
             <div className="reservation-list">
-                {displayed.length ? displayed.map(item => {
+                {category === "Combined" ? combinedLoading ? <div className="reservations-empty-state"><p>Loading combined stays...</p></div> : displayedCombined.length ? displayedCombined.map(item => {
+                    const hotelReservation = item.reservation?.find(reservation => reservation.room_id != null);
+                    const diningReservation = item.reservation?.find(reservation => reservation.table_id != null);
+                    const room = rooms.find(candidate => candidate.room_id === hotelReservation?.room_id) ?? hotelReservation?.room;
+                    const table = tables.find(candidate => candidate.table_id === diningReservation?.table_id) ?? diningReservation?.restaurant_table;
+                    const guestName = item.user ? `${item.user.first_name} ${item.user.last_name}`.trim() || item.user.email : "—";
+                    const propertyName = [room?.hotel?.name, table?.restaurant?.name].filter(Boolean).join(" + ") || "Combined Stay";
+                    return <article className="reservation-card" key={item.combined_booking_id}>
+                        <div className="reservation-image-placeholder">Stay + Dining</div>
+                        <div className="reservation-details">
+                            <div className="reservation-card-heading"><div><h2>{propertyName}</h2><p>Guest: {guestName}</p><p>{room ? `Room ${room.room_number}` : ""}{table ? ` · Table ${table.table_number}` : ""}</p></div><span className={`reservation-status ${item.status.toLowerCase()}`}>{item.status}</span></div>
+                            <div className="reservation-meta"><div><span>CHECK-IN</span><strong>{hotelReservation?.check_in_date?.slice(0, 10) ?? "—"}</strong></div><div><span>DINING</span><strong>{diningReservation?.reservation_date?.slice(0, 10) ?? "—"}</strong></div><div><span>RESERVATIONS</span><strong>{item.reservation?.length ?? 0}</strong></div></div>
+                            <div className="reservation-card-footer"><span />{manager && item.status !== "Cancelled" && <button type="button" className="cancel-reservation-button" onClick={() => combinedStatus(item, "Cancelled")}>Cancel</button>}</div>
+                        </div>
+                    </article>;
+                }) : <div className="reservations-empty-state"><h2>No combined stays found</h2><p>Try another status filter.</p></div> : itemsLoading ? <div className="reservations-empty-state"><p>Loading reservations...</p></div> : displayed.length ? displayed.map(item => {
                     const room = rooms.find(candidate => candidate.room_id === item.room_id) ?? item.room;
                     const table = tables.find(candidate => candidate.table_id === item.table_id) ?? item.restaurant_table;
                     const hotel = room?.hotel;
@@ -476,7 +546,7 @@ function Reservations({ manageView = false }: { manageView?: boolean } = {}) {
                     const end = isHotel ? item.check_out_date : item.end_time;
                     const nights = isHotel && item.check_in_date && item.check_out_date ? Math.ceil((Date.parse(item.check_out_date) - Date.parse(item.check_in_date)) / 86400000) : null;
                     const nightlyRate = isHotel && room?.price_per_night != null ? `₱${Number(room.price_per_night).toLocaleString("en-PH")} / night` : null;
-                    const guestName = item.user ? `${item.user.first_name} ${item.user.last_name}` : "—";
+                    const guestName = item.user ? `${item.user.first_name} ${item.user.last_name}`.trim() || item.user.email : "—";
                     return <article className="reservation-card" key={item.reservation_id}>
                         <div className="reservation-image-placeholder">{isHotel ? "Stay" : "Dining"}</div>
                         <div className="reservation-details">
@@ -492,9 +562,6 @@ function Reservations({ manageView = false }: { manageView?: boolean } = {}) {
                             <div className="reservation-card-footer">
                                 {nightlyRate ? <strong className="reservation-price">{nightlyRate}</strong> : <span />}
                                 <div>
-                                    <button type="button" className="combined-stay-button" onClick={() => show(item)}>Details</button>
-                                    {manager && item.status === "Pending" && <button type="button" className="combined-stay-button" onClick={() => status(item, "Confirmed")}>Confirm</button>}
-                                    {manager && item.status === "Confirmed" && <button type="button" className="combined-stay-button" onClick={() => status(item, "Completed")}>Complete</button>}
                                     {manager && item.status !== "Cancelled" && <button type="button" className="cancel-reservation-button" onClick={() => status(item, "Cancelled")}>Cancel</button>}
                                 </div>
                             </div>
@@ -509,80 +576,19 @@ function Reservations({ manageView = false }: { manageView?: boolean } = {}) {
 }
 
 function CombinedBookings() {
-    const { user } = useAuth(); const manager = isManager(user); const [items, setItems] = useState<CombinedBooking[]>([]); const [rooms, setRooms] = useState<Room[]>([]); const [tables, setTables] = useState<RestaurantTable[]>([]); const [error, setError] = useState(""); const [message, setMessage] = useState(""); const [step, setStep] = useState(1); const [selectedHotelId, setSelectedHotelId] = useState(""); const [selectedRestaurantId, setSelectedRestaurantId] = useState(""); const [form, setForm] = useState({ room_id: "", check_in_date: "", check_out_date: "", table_id: "", reservation_date: "", start_time: "", end_time: "" });
-    const load = () => apiGet<CombinedBooking[]>("/combined-bookings").then(setItems).catch(e => setError(e.message));
-    useEffect(() => { load(); apiGet<Room[]>("/rooms").then(data => { setRooms(data); if (data[0]) setSelectedHotelId(String(data[0].hotel_id)); }).catch(() => undefined); apiGet<RestaurantTable[]>("/tables").then(data => { setTables(data); if (data[0]) setSelectedRestaurantId(String(data[0].restaurant_id)); }).catch(() => undefined); }, []);
-    const submit = async (event: FormEvent) => { event.preventDefault(); setError(""); setMessage(""); try { await apiPost("/combined-bookings/hotel-restaurant", buildCombinedBookingPayload({ roomId: Number(form.room_id), checkIn: form.check_in_date, checkOut: form.check_out_date, tableId: Number(form.table_id), date: form.reservation_date, startTime: form.start_time, endTime: form.end_time })); setMessage("Combined booking created"); load(); setStep(1); } catch (e) { setError(e instanceof Error ? e.message : "Combined booking failed"); } };
-    const status = async (item: CombinedBooking, next: string) => { try { await apiPatch(`/combined-bookings/${item.combined_booking_id}/status`, { status: next }); load(); } catch (e) { setError(e instanceof Error ? e.message : "Status update failed"); } };
-    const hotelIds = Array.from(new Set(rooms.map(room => room.hotel_id)));
-    const restaurantIds = Array.from(new Set(tables.map(table => table.restaurant_id)));
-    const hotelRooms = rooms.filter(room => String(room.hotel_id) === selectedHotelId);
-    const restaurantTables = tables.filter(table => String(table.restaurant_id) === selectedRestaurantId);
-    const selectedRoom = rooms.find(room => String(room.room_id) === form.room_id);
-    const selectedTable = tables.find(table => String(table.table_id) === form.table_id);
-    const selectedHotel = selectedRoom?.hotel;
-    const selectedRestaurant = selectedTable?.restaurant;
-    const advance = () => {
-        setError("");
-        if (step === 1 && (!form.room_id || !form.check_in_date || !form.check_out_date)) { setError("Choose a room and enter check-in and check-out dates."); return; }
-        if (step === 2 && (!form.table_id || !form.reservation_date || !form.start_time || !form.end_time)) { setError("Choose a table and enter the dining date, start time, and end time."); return; }
-        setStep(value => Math.min(3, value + 1));
-    };
-    return <>
-        <section className="combined-wizard">
-            <div className="combined-wizard-container">
-                <header className="combined-wizard-header">
-                    <p className="eyebrow">YOUR COMPLETE GETAWAY</p>
-                    <h1>Plan Your Complete Stay</h1>
-                    <p>Select a room, then choose a table and dining time.</p>
-                </header>
-                {message && <p className="alert success" role="status">{message}</p>}{error && <p className="combined-error" role="alert">{error}</p>}
-                <div className="combined-steps">{[{ number: 1, label: "Hotel & Room" }, { number: 2, label: "Restaurant" }, { number: 3, label: "Review" }].map(item => <div key={item.number} className={`combined-step ${step === item.number ? "active" : ""} ${step > item.number ? "completed" : ""}`}><span>{step > item.number ? "✓" : item.number}</span><small>{item.label}</small></div>)}</div>
-                <form className="combined-wizard-form" onSubmit={submit}>
-                    {step === 1 && <>
-                        <p className="eyebrow">CHOOSE YOUR HOTEL</p>
-                        <div className="combined-hotel-grid">{hotelIds.map(hotelId => {
-                            const hotel = rooms.find(room => room.hotel_id === hotelId)?.hotel;
-                            return <button type="button" key={hotelId} className={`combined-hotel-card ${selectedHotelId === String(hotelId) ? "selected" : ""}`} onClick={() => { setSelectedHotelId(String(hotelId)); setForm({ ...form, room_id: "" }); }} aria-pressed={selectedHotelId === String(hotelId)}><span className="combined-card-copy"><strong>{hotel?.name ?? `Hotel #${hotelId}`}</strong><small>{hotel?.address ?? ""}</small></span></button>;
-                        })}</div>
-                        <p className="eyebrow combined-section-label">SELECT A ROOM</p>
-                        <div className="combined-room-list">{hotelRooms.map(room => <label key={room.room_id} className={`combined-room-option ${form.room_id === String(room.room_id) ? "selected" : ""}`}><input type="radio" name="room" value={room.room_id} checked={form.room_id === String(room.room_id)} onChange={() => setForm({ ...form, room_id: String(room.room_id) })} /><span className="combined-room-copy"><strong>{room.room_type} · Room {room.room_number}</strong><small>{room.status} · Capacity {room.capacity}</small></span><strong className="combined-room-price">₱{Number(room.price_per_night).toLocaleString("en-PH")}<small>/ night</small></strong></label>)}</div>
-                        <div className="combined-fields"><p className="eyebrow">DATES</p><div className="combined-field-grid"><label>Check-in<input type="date" value={form.check_in_date} onChange={event => setForm({ ...form, check_in_date: event.target.value })} required /></label><label>Check-out<input type="date" min={form.check_in_date || undefined} value={form.check_out_date} onChange={event => setForm({ ...form, check_out_date: event.target.value })} required /></label></div></div>
-                    </>}
-                    {step === 2 && <>
-                        <p className="eyebrow">CHOOSE YOUR RESTAURANT</p>
-                        <div className="combined-hotel-grid">{restaurantIds.map(restaurantId => {
-                            const restaurant = tables.find(table => table.restaurant_id === restaurantId)?.restaurant;
-                            return <button type="button" key={restaurantId} className={`combined-hotel-card ${selectedRestaurantId === String(restaurantId) ? "selected" : ""}`} onClick={() => { setSelectedRestaurantId(String(restaurantId)); setForm({ ...form, table_id: "" }); }} aria-pressed={selectedRestaurantId === String(restaurantId)}><span className="combined-card-copy"><strong>{restaurant?.name ?? `Restaurant #${restaurantId}`}</strong><small>{restaurant?.address ?? ""}</small></span></button>;
-                        })}</div>
-                        <p className="eyebrow combined-section-label">SELECT A TABLE</p>
-                        <div className="combined-room-list">{restaurantTables.map(table => <label key={table.table_id} className={`combined-room-option ${form.table_id === String(table.table_id) ? "selected" : ""}`}><input type="radio" name="table" value={table.table_id} checked={form.table_id === String(table.table_id)} onChange={() => setForm({ ...form, table_id: String(table.table_id) })} /><span className="combined-room-copy"><strong>Table {table.table_number}</strong><small>{table.status} · Capacity {table.capacity}</small></span></label>)}</div>
-                        <div className="combined-fields"><p className="eyebrow">DINING DETAILS</p><div className="combined-field-grid"><label>Dining date<input type="date" min={form.check_in_date || undefined} max={form.check_out_date || undefined} value={form.reservation_date} onChange={event => setForm({ ...form, reservation_date: event.target.value })} required /></label><label>Preferred time<input type="time" value={form.start_time} onChange={event => setForm({ ...form, start_time: event.target.value })} required /></label><label>End time<input type="time" value={form.end_time} onChange={event => setForm({ ...form, end_time: event.target.value })} required /></label></div></div>
-                    </>}
-                    {step === 3 && <>
-                        <p className="eyebrow">CHECK YOUR SELECTIONS</p><h2 className="combined-review-title">Review Your Complete Stay</h2>
-                        <div className="combined-review-card"><h3>Hotel &amp; Room</h3><p>{selectedHotel?.name ?? (selectedRoom ? `Hotel #${selectedRoom.hotel_id}` : "—")}</p><p>{selectedRoom?.room_type} · Room {selectedRoom?.room_number}</p><p>{form.check_in_date} → {form.check_out_date}</p>{selectedRoom && <strong>₱{Number(selectedRoom.price_per_night).toLocaleString("en-PH")}<small> per night</small></strong>}</div>
-                        <div className="combined-review-card"><h3>Dining Reservation</h3><p>{selectedRestaurant?.name ?? (selectedTable ? `Restaurant #${selectedTable.restaurant_id}` : "—")}</p><p>Table {selectedTable?.table_number}</p><p>{form.reservation_date} · {form.start_time}–{form.end_time}</p></div>
-                    </>}
-                    <div className="combined-form-actions">
-                        {step > 1 && <button type="button" className="combined-secondary-button" onClick={() => { setError(""); setStep(value => value - 1); }}>Back</button>}
-                        {step < 3 ? <button type="button" className="combined-primary-button" onClick={advance}>Continue</button> : <button type="submit" className="combined-primary-button" disabled={!canCreateReservations(user)}>Create Combined Booking</button>}
-                    </div>
-                </form>
-            </div>
-        </section>
-        {message && <div className="alert success">{message}</div>}
-        <section className="listing-section staff-manage-page"><p className="eyebrow">STAFF WORKSPACE</p><h1>Combined Bookings</h1><div className="staff-table-wrap"><table className="staff-reservations-table"><thead><tr><th>Reservation</th><th>Guest</th><th>Property / Booking</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead><tbody>{items.map(item => {
-            const hotelReservation = item.reservation?.find(reservation => reservation.room_id != null);
-            const diningReservation = item.reservation?.find(reservation => reservation.table_id != null);
-            const room = rooms.find(candidate => candidate.room_id === hotelReservation?.room_id) ?? hotelReservation?.room;
-            const table = tables.find(candidate => candidate.table_id === diningReservation?.table_id) ?? diningReservation?.restaurant_table;
-            const count = item.reservation?.length ?? 0;
-            return <tr key={item.combined_booking_id}><td><strong>#{item.combined_booking_id}</strong><small>{count} {count === 1 ? "reservation" : "reservations"}</small>{item.created_at && <small>Created {item.created_at.slice(0, 10)}</small>}</td><td>{item.user ? `${item.user.first_name} ${item.user.last_name}` : "—"}</td><td><strong>{room?.hotel?.name ?? (room ? `Hotel #${room.hotel_id}` : "—")}{table?.restaurant?.name ? ` + ${table.restaurant.name}` : ""}</strong><small>{room ? `Room ${room.room_number}` : "—"}{table ? ` · Table ${table.table_number}` : ""}</small></td><td>{hotelReservation?.check_in_date ?? diningReservation?.reservation_date ?? "—"}{hotelReservation?.check_out_date && <small>Until {hotelReservation.check_out_date.slice(0, 10)}</small>}{hotelReservation && diningReservation?.reservation_date && <small>{diningReservation.reservation_date.slice(0, 10)} {diningReservation.start_time ?? ""}{diningReservation.end_time ? `–${diningReservation.end_time}` : ""}</small>}</td><td><span className={`reservation-status ${item.status.toLowerCase()}`}>{item.status}</span></td><td><div className="staff-table-actions">{manager && item.status === "Pending" && <button type="button" onClick={() => status(item, "Confirmed")}>Confirm</button>}{manager && item.status === "Confirmed" && <button type="button" onClick={() => status(item, "Completed")}>Complete</button>}</div></td></tr>;
-        })}{items.length === 0 && <tr><td colSpan={6} className="staff-empty-state">No combined bookings found.</td></tr>}</tbody></table></div></section>
-    </>;
+    const { user } = useAuth(); const manager = isManager(user); const [items, setItems] = useState<CombinedBooking[]>([]); const [rooms, setRooms] = useState<Room[]>([]); const [tables, setTables] = useState<RestaurantTable[]>([]); const [error, setError] = useState(''); const [loading, setLoading] = useState(true);
+    const load = () => { setLoading(true); apiGet<CombinedBooking[]>('/combined-bookings').then(setItems).catch(e => setError(e.message)).finally(() => setLoading(false)); };
+    useEffect(() => { load(); apiGet<Room[]>('/rooms').then(setRooms).catch(() => undefined); apiGet<RestaurantTable[]>('/tables').then(setTables).catch(() => undefined); }, []);
+    const status = async (item: CombinedBooking, next: string) => { try { await apiPatch(`/combined-bookings/${item.combined_booking_id}/status`, { status: next }); load(); } catch (e) { setError(e instanceof Error ? e.message : 'Status update failed'); } };
+    return <section className="listing-section staff-manage-page"><p className="eyebrow">STAFF WORKSPACE</p><h1>Combined Bookings</h1>{error && <div className="alert error">{error}</div>}<div className="staff-table-wrap"><table className="staff-reservations-table"><thead><tr><th>Reservation</th><th>Guest</th><th>Property / Booking</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead><tbody>{items.map(item => {
+        const hotelReservation = item.reservation?.find(reservation => reservation.room_id != null);
+        const diningReservation = item.reservation?.find(reservation => reservation.table_id != null);
+        const room = rooms.find(candidate => candidate.room_id === hotelReservation?.room_id) ?? hotelReservation?.room;
+        const table = tables.find(candidate => candidate.table_id === diningReservation?.table_id) ?? diningReservation?.restaurant_table;
+        const count = item.reservation?.length ?? 0;
+        return <tr key={item.combined_booking_id}><td><strong>#{item.combined_booking_id}</strong><small>{count} {count === 1 ? 'reservation' : 'reservations'}</small>{item.created_at && <small>Created {item.created_at.slice(0, 10)}</small>}</td><td>{item.user ? `${item.user.first_name} ${item.user.last_name}` : '—'}</td><td><strong>{room?.hotel?.name ?? (room ? `Hotel #${room.hotel_id}` : '—')}{table?.restaurant?.name ? ` + ${table.restaurant.name}` : ''}</strong><small>{room ? `Room ${room.room_number}` : '—'}{table ? ` · Table ${table.table_number}` : ''}</small></td><td>{hotelReservation?.check_in_date ?? diningReservation?.reservation_date ?? '—'}{hotelReservation?.check_out_date && <small>Until {hotelReservation.check_out_date.slice(0, 10)}</small>}{hotelReservation && diningReservation?.reservation_date && <small>{diningReservation.reservation_date.slice(0, 10)} {diningReservation.start_time ?? ''}{diningReservation.end_time ? `–${diningReservation.end_time}` : ''}</small>}</td><td><span className={`reservation-status ${item.status.toLowerCase()}`}>{item.status}</span></td><td><div className="staff-table-actions">{manager && item.status === 'Pending' && <button type="button" onClick={() => status(item, 'Confirmed')}>Confirm</button>}{manager && item.status === 'Confirmed' && <button type="button" onClick={() => status(item, 'Completed')}>Complete</button>}</div></td></tr>;
+    })}{loading ? <tr><td colSpan={6} className="staff-empty-state">Loading combined bookings...</td></tr> : items.length === 0 && <tr><td colSpan={6} className="staff-empty-state">No combined bookings found.</td></tr>}</tbody></table></div></section>;
 }
-
 function Reports() {
     const [report, setReport] = useState("reservations"); const [filters, setFilters] = useState({ date_from: "", date_to: "", status: "", type: "", hotel_id: "", restaurant_id: "", room_id: "", table_id: "" });
     const [data, setData] = useState<Record<string, unknown> | null>(null); const [error, setError] = useState(""); const [loading, setLoading] = useState(true);
