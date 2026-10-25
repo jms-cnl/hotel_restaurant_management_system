@@ -143,11 +143,13 @@ function CombinedBookingsRoute() {
 }
 
 function Notifications() {
+    const { user } = useAuth();
+    const manager = isManager(user);
     const [items, setItems] = useState<Record<string, unknown>[]>([]); const [error, setError] = useState(""); const [loading, setLoading] = useState(true);
     const load = () => { setLoading(true); return apiGet<Record<string, unknown>[]>("/notifications").then(setItems).catch(e => setError(e.message)).finally(() => setLoading(false)); };
     useEffect(() => { void load(); }, []);
     const markRead = async (id: number) => { try { await apiPatch(`/notifications/${id}/read`, {}); load(); } catch (e) { setError(e instanceof Error ? e.message : "Unable to update notification"); } };
-    return <Page title="Notifications" error={error} loading={loading}>{items.length ? <div className="detail"><ul>{items.map(item => <li key={String(item.notification_id)}><strong>{String(item.title)}</strong>: {String(item.message)} <small>{item.created_at ? new Date(String(item.created_at)).toLocaleString() : ""}</small> {Boolean(item.is_read) ? <span>Read</span> : <button onClick={() => markRead(Number(item.notification_id))}>Mark read</button>}</li>)}</ul></div> : <p className="empty">No notifications.</p>}</Page>;
+    return <Page title="Notifications" error={error} loading={loading}>{items.length ? <div className={manager ? "detail manager-notifications" : "detail"}><ul>{items.map(item => <li key={String(item.notification_id)}><strong>{String(item.title)}</strong>: {String(item.message)} <small>{item.created_at ? new Date(String(item.created_at)).toLocaleString() : ""}</small> {Boolean(item.is_read) ? <span>Read</span> : <button onClick={() => markRead(Number(item.notification_id))}>Mark read</button>}</li>)}</ul></div> : <p className={manager ? "empty manager-notifications-empty" : "empty"}>No notifications.</p>}</Page>;
 }
 
 function Users() {
