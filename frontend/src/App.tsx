@@ -187,7 +187,18 @@ function Notifications() {
     const load = () => { setLoading(true); return apiGet<Record<string, unknown>[]>("/notifications").then(setItems).catch(e => setError(e.message)).finally(() => setLoading(false)); };
     useEffect(() => { void load(); }, []);
     const markRead = async (id: number) => { try { await apiPatch(`/notifications/${id}/read`, {}); load(); } catch (e) { setError(e instanceof Error ? e.message : "Unable to update notification"); } };
-    return <Page title="Notifications" error={error} loading={loading}>{items.length ? <div className={manager ? "detail manager-notifications" : "detail"}><ul>{items.map(item => <li key={String(item.notification_id)}><strong>{String(item.title)}</strong>: {String(item.message)} <small>{item.created_at ? new Date(String(item.created_at)).toLocaleString() : ""}</small> {Boolean(item.is_read) ? <span>Read</span> : <button onClick={() => markRead(Number(item.notification_id))}>Mark read</button>}</li>)}</ul></div> : <p className={manager ? "empty manager-notifications-empty" : "empty"}>No notifications.</p>}</Page>;
+    if (manager) return <section className="listing-section">
+        <h1>Notifications</h1>
+        {error && <div className="alert error">{error}</div>}
+        {loading ? <p>Loading...</p> : items.length ? <div className="reservation-list">{items.map(item => <article className="reservation-card" key={String(item.notification_id)}>
+            <div className="reservation-details">
+                <div className="reservation-card-heading"><div><h2>{String(item.title)}</h2><p>{String(item.message)}</p></div><span className={`reservation-status ${Boolean(item.is_read) ? "confirmed" : ""}`}>{Boolean(item.is_read) ? "Read" : "Unread"}</span></div>
+                <div className="reservation-meta"><div><span>DATE</span><strong>{item.created_at ? new Date(String(item.created_at)).toLocaleString() : "—"}</strong></div></div>
+                {!Boolean(item.is_read) && <div className="reservation-card-footer"><span /><button type="button" className="combined-stay-button" onClick={() => markRead(Number(item.notification_id))}>Mark Read</button></div>}
+            </div>
+        </article>)}</div> : <p>Your notifications will appear here.</p>}
+    </section>;
+    return <Page title="Notifications" error={error} loading={loading}>{items.length ? <div className="detail"><ul>{items.map(item => <li key={String(item.notification_id)}><strong>{String(item.title)}</strong>: {String(item.message)} <small>{item.created_at ? new Date(String(item.created_at)).toLocaleString() : ""}</small> {Boolean(item.is_read) ? <span>Read</span> : <button onClick={() => markRead(Number(item.notification_id))}>Mark read</button>}</li>)}</ul></div> : <p className="empty">No notifications.</p>}</Page>;
 }
 
 function Users() {

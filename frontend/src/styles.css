@@ -271,50 +271,6 @@ button:hover { background: #e5e7eb; }
   .manager-app .staff-manage-toolbar input { flex: 1 1 auto; max-width: none; }
 }
 
-.manager-app .manager-notifications {
-  padding: 1rem;
-  border: 1px solid #253249;
-  border-radius: 8px;
-  background: #101827;
-  color: #f5f5f5;
-}
-.manager-app .manager-notifications ul {
-  display: grid;
-  gap: .75rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.manager-app .manager-notifications li {
-  padding: 1rem;
-  border: 1px solid #253249;
-  border-radius: 8px;
-  background: #0b1428;
-}
-.manager-app .manager-notifications li small {
-  display: block;
-  margin-top: .4rem;
-  color: #b9c2d2;
-}
-.manager-app .manager-notifications li span {
-  color: #b9c2d2;
-}
-.manager-app .manager-notifications li button {
-  margin-top: .65rem;
-  border-color: #34415a;
-  background: transparent;
-  color: #e4bd70;
-}
-.manager-app .manager-notifications li button:hover {
-  border-color: #e4bd70;
-}
-.manager-app .manager-notifications-empty {
-  padding: 1rem;
-  border: 1px dashed #34415a;
-  border-radius: 8px;
-  background: #101827;
-  color: #b9c2d2;
-}
 .manager-app .manager-profile-overview,
 .manager-app .manager-profile-form,
 .manager-app .manager-profile-password-form {
