@@ -111,6 +111,49 @@ button:hover { background: #e5e7eb; }
   margin: 0 0 18px;
 }
 
+.manager-app .staff-activity-list {
+  display: grid;
+  gap: 13px;
+}
+.manager-app .staff-activity-list article {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.manager-app .staff-activity-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: #2c3d4e;
+}
+.manager-app .staff-activity-list article > div {
+  flex: 1;
+  min-width: 0;
+}
+.manager-app .staff-activity-list strong {
+  color: #f8f7f4;
+  font-size: 0.85rem;
+}
+.manager-app .staff-activity-list p {
+  margin: 3px 0 0;
+  color: #a9b7c8;
+  font-size: 0.78rem;
+}
+.manager-app .staff-status {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+.manager-app .staff-status.confirmed { color: #70d5a2; background: #24483e; }
+.manager-app .staff-status.pending { color: #f1a36e; background: #4a352d; }
+.manager-app .staff-status.cancelled { color: #e36b72; background: #3d2832; }
+.manager-app .staff-status.completed { color: #8fa8c4; background: #283749; }
+
 .manager-app .staff-status-breakdown {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -153,6 +196,10 @@ button:hover { background: #e5e7eb; }
 
 .manager-app .staff-status-track .cancelled {
   background: #e36b72;
+}
+
+.manager-app .staff-status-track .completed {
+  background: #8fa8c4;
 }
 
 .manager-app .staff-status-item small {

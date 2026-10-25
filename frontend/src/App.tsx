@@ -115,15 +115,25 @@ function AuthPage({ registerMode = false }: { registerMode?: boolean }) {
 
 function Dashboard() {
     const { user } = useAuth();
-    const [data, setData] = useState<Record<string, number> | null>(null); const [error, setError] = useState("");
-    useEffect(() => { apiGet<Record<string, number>>("/dashboard").then(setData).catch(e => setError(e.message)); }, []);
+    const [data, setData] = useState<Record<string, number> | null>(null); const [items, setItems] = useState<Reservation[]>([]); const [reservationsLoading, setReservationsLoading] = useState(true); const [rooms, setRooms] = useState<Room[]>([]); const [tables, setTables] = useState<RestaurantTable[]>([]); const [error, setError] = useState("");
+    useEffect(() => {
+        apiGet<Record<string, number>>("/dashboard").then(setData).catch(e => setError(e.message));
+        apiGet<Reservation[]>("/reservations").then(setItems).catch(e => setError(e.message)).finally(() => setReservationsLoading(false));
+        apiGet<Room[]>("/rooms").then(setRooms).catch(() => undefined);
+        apiGet<RestaurantTable[]>("/tables").then(setTables).catch(() => undefined);
+    }, []);
     if (!data) return <Page title="Dashboard" error={error} loading={!error}>{null}</Page>;
     const occupiedRooms = Math.max(0, data.rooms - data.availableRooms);
     const occupancy = data.rooms > 0 ? Math.round((occupiedRooms / data.rooms) * 100) : 0;
+    const hotelReservations = items.filter(item => item.reservation_type === "HOTEL");
+    const diningReservations = items.filter(item => item.reservation_type === "RESTAURANT");
+    const active = (item: Reservation) => item.status === "Pending" || item.status === "Confirmed";
+    const recent = [...items].sort((left, right) => Date.parse(right.created_at ?? "") - Date.parse(left.created_at ?? "")).slice(0, 5);
     const statusCounts = [
-        { label: "Confirmed", count: data.confirmedReservations, className: "confirmed" },
-        { label: "Pending", count: data.pendingReservations, className: "pending" },
-        { label: "Cancelled", count: data.cancelledReservations, className: "cancelled" }
+        { label: "Confirmed", count: items.filter(item => item.status === "Confirmed").length, className: "confirmed" },
+        { label: "Pending", count: items.filter(item => item.status === "Pending").length, className: "pending" },
+        { label: "Cancelled", count: items.filter(item => item.status === "Cancelled").length, className: "cancelled" },
+        { label: "Completed", count: items.filter(item => item.status === "Completed").length, className: "completed" }
     ];
     const statusTotal = statusCounts.reduce((total, item) => total + item.count, 0);
     return <section className="listing-section staff-dashboard-page">
@@ -137,12 +147,41 @@ function Dashboard() {
         </div>
         <div className="staff-dashboard-stats">
             <article className="staff-dashboard-stat">
+                <p>HOTEL BOOKINGS</p>
+                <span className="staff-stat-icon">🏨</span>
+                <strong>{hotelReservations.filter(active).length}</strong>
+                <small>{hotelReservations.length} total</small>
+            </article>
+            <article className="staff-dashboard-stat">
                 <p>ROOM OCCUPANCY</p>
                 <span className="staff-stat-icon">📊</span>
                 <strong className="orange-stat">{occupancy}%</strong>
                 <small>{occupiedRooms}/{data.rooms} rooms occupied</small>
             </article>
+            <article className="staff-dashboard-stat">
+                <p>TABLE RESERVATIONS</p>
+                <span className="staff-stat-icon">🍽️</span>
+                <strong className="gold-stat">{diningReservations.filter(active).length}</strong>
+                <small>{diningReservations.length} total</small>
+            </article>
         </div>
+        <section className="staff-dashboard-panel">
+            <h2>Recent Activity</h2>
+            <div className="staff-activity-list">
+                {recent.map(item => {
+                    const room = item.room ?? rooms.find(candidate => candidate.room_id === item.room_id);
+                    const table = item.restaurant_table ?? tables.find(candidate => candidate.table_id === item.table_id);
+                    const property = room?.hotel?.name ?? table?.restaurant?.name ?? "—";
+                    const guest = item.user ? `${item.user.first_name} ${item.user.last_name}`.trim() || item.user.email : "—";
+                    return <article key={item.reservation_id}>
+                        <span className="staff-activity-icon">{item.reservation_type === "HOTEL" ? "🏨" : "🍽️"}</span>
+                        <div><strong>{guest}</strong><p>{property}</p></div>
+                        <span className={`staff-status ${item.status.toLowerCase()}`}>{item.status}</span>
+                    </article>;
+                })}
+                {reservationsLoading ? <p>Loading reservations...</p> : items.length === 0 && <p>No recent reservations.</p>}
+            </div>
+        </section>
         <section className="staff-dashboard-panel">
             <h2>Reservation Status Breakdown</h2>
             <div className="staff-status-breakdown">
