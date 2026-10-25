@@ -11,6 +11,71 @@ button:hover { background: #e5e7eb; }
 .nav { display: flex; flex-wrap: wrap; gap: .8rem; padding: .7rem 1.2rem; background: #fff; border-bottom: 1px solid #d1d5db; }
 .nav a { color: #1d4ed8; text-decoration: none; }
 .content { max-width: 1200px; margin: 0 auto; padding: 1.2rem; }
+.manager-app { min-height: 100vh; }
+.manager-app .manager-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px 5%;
+  border-bottom: 1px solid #253249;
+  background: #101827;
+  color: #f5f5f5;
+}
+.manager-app .manager-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+.manager-app .manager-identity,
+.manager-app .manager-nav a {
+  color: #b9c2d2;
+  font-size: .78rem;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+.manager-app .manager-nav {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: .7rem 5%;
+  border-bottom: 1px solid #253249;
+  background: #101827;
+  color: #f5f5f5;
+}
+.manager-app .manager-nav a:hover { color: #e4bd70; }
+.manager-app .manager-signout {
+  padding: 9px 12px;
+  border: 1px solid #34415a;
+  border-radius: 7px;
+  background: transparent;
+  color: #e4bd70;
+  font-size: .8rem;
+}
+.manager-app .manager-signout:hover { border-color: #e4bd70; }
+.manager-app .manager-content {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 5%;
+}
+@media (max-width: 850px) {
+  .manager-app .manager-topbar { flex-wrap: wrap; }
+  .manager-app .manager-nav { justify-content: center; gap: 18px; }
+  .manager-app .manager-content { padding-top: 30px; }
+}
+@media (max-width: 520px) {
+  .manager-app .manager-topbar { gap: 15px; padding: 15px 5%; }
+  .manager-app .manager-nav { gap: 12px; }
+  .manager-app .manager-nav a,
+  .manager-app .manager-identity { font-size: .68rem; }
+  .manager-app .manager-signout { padding: 8px; font-size: .72rem; }
+  .manager-app .manager-content { padding: 28px 5%; }
+}
 .page-heading { display: flex; justify-content: space-between; align-items: center; }
 h1 { margin-top: 0; }
 .center, .auth-page { min-height: 100vh; display: grid; place-items: center; }

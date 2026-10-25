@@ -38,10 +38,10 @@ function AppLayout({ children }: { children: ReactNode }) {
     const links = role(user) === "Customer"
         ? [["Home", "/home"], ["Hotels", "/hotels"], ["Restaurants", "/restaurants"], ["My Reservations", "/reservations"], ["My Combined Bookings", "/combined-bookings"], ["Notifications", "/notifications"], ["Profile", "/profile"]]
         : [["Dashboard", "/dashboard"], ["Hotels", "/hotels"], ["Restaurants", "/restaurants"], ["Rooms", "/rooms"], ["Tables", "/tables"], ["Reservations", "/reservations"], ["Combined Bookings", "/combined-bookings"], ["Reports", "/reports"], ...(isAdmin(user) ? [["Users", "/users"]] : []), ["Notifications", "/notifications"], ["Profile", "/profile"]];
-    return <div className="app-shell">
-        <header className="topbar"><Link className="brand" to={landingPath(user)}>HRM reservations</Link><span>{user?.first_name} {user?.last_name} ({role(user)})</span><button onClick={async () => { await logout(); navigate("/login"); }}>Log out</button></header>
-        <nav className="nav">{links.map(([label, path]) => <Link key={path} to={path}>{label}</Link>)}</nav>
-        <main className="content">{children}</main>
+    return <div className="app-shell manager-app">
+        <header className="manager-topbar"><Link className="manager-brand" to={landingPath(user)}>HRM reservations</Link><span className="manager-identity">{user?.first_name} {user?.last_name} ({role(user)})</span><button className="manager-signout" onClick={async () => { await logout(); navigate("/login"); }}>Log out</button></header>
+        <nav className="manager-nav" aria-label="Manager navigation">{links.map(([label, path]) => <Link key={path} to={path}>{label}</Link>)}</nav>
+        <main className="manager-content">{children}</main>
     </div>;
 }
 
