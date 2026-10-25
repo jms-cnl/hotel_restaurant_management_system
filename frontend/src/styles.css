@@ -174,6 +174,103 @@ button:hover { background: #e5e7eb; }
     flex-direction: column;
   }
 }
+.manager-app .staff-manage-page {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 20px clamp(12px, 2vw, 28px);
+  box-sizing: border-box;
+}
+.manager-app .staff-manage-page *,
+.manager-app .staff-manage-page *::before,
+.manager-app .staff-manage-page *::after { box-sizing: border-box; }
+.manager-app .staff-manage-tabs {
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 16px;
+  border-bottom: 1px solid #344158;
+}
+.manager-app .staff-manage-tab {
+  display: flex; align-items: center; gap: 10px; padding: 9px 13px;
+  border: 0; border-bottom: 2px solid transparent; background: transparent;
+  color: #aebbc9; cursor: pointer; font: inherit; text-decoration: none;
+}
+.manager-app .staff-manage-tab.active { color: #e7c99a; border-bottom-color: #e7c99a; }
+.manager-app .staff-manage-tab span {
+  padding: 2px 8px; border-radius: 12px; background: #2a374a;
+  color: #f8f7f4; font-size: 0.75rem;
+}
+.manager-app .staff-manage-toolbar {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  gap: 12px; margin-bottom: 18px; color: #aebbc9; font-size: 0.85rem;
+}
+.manager-app .staff-manage-toolbar input {
+  flex: 1 1 320px; width: 100%; max-width: 440px; min-width: 0; padding: 12px 14px;
+  border: 1px solid #344158; border-radius: 8px; background: #111c2e;
+  color: #f8f7f4; font: inherit;
+}
+.manager-app .staff-table-wrap {
+  width: 100%; max-width: 100%; overflow-x: auto; border: 1px solid #344158;
+  border-radius: 12px; background: #111c2e;
+}
+.manager-app .staff-reservations-table {
+  width: 100%; min-width: 0; table-layout: auto; border-collapse: collapse;
+  text-align: left; font-size: 0.8rem;
+}
+.manager-app .staff-reservations-table th {
+  padding: 12px 8px; background: #1e2d3d; color: #c6d0dd; font-size: 0.72rem;
+  letter-spacing: 0.03em; text-transform: uppercase; white-space: normal;
+}
+.manager-app .staff-reservations-table td {
+  padding: 12px 8px; border-top: 1px solid #29384b; color: #edf0f5;
+  font-size: 0.82rem; vertical-align: middle; overflow-wrap: anywhere;
+}
+.manager-app .staff-reservations-table td strong,
+.manager-app .staff-reservations-table td small { display: block; }
+.manager-app .staff-reservations-table td small {
+  margin-top: 5px; color: #9cabbc; font-size: 0.75rem;
+}
+.manager-app .staff-reservations-table td:last-child { min-width: 220px; overflow-wrap: normal; }
+.manager-app .staff-status-select {
+  width: 100%; max-width: 130px; padding: 7px 9px; border: 1px solid #48546a;
+  border-radius: 7px; background: #172438; color: #f8f7f4;
+}
+.manager-app .staff-status-select.confirmed { border-color: #377b61; }
+.manager-app .staff-status-select.pending { border-color: #98613b; }
+.manager-app .staff-status-select.cancelled { border-color: #9b4d50; }
+.manager-app .staff-status-select.completed { border-color: #657d99; }
+.manager-app .staff-table-actions {
+  display: flex; flex-flow: row nowrap; align-items: center; gap: 6px; white-space: nowrap;
+}
+.manager-app .staff-table-actions button {
+  flex: 0 0 auto; padding: 8px 12px; border: 1px solid #48546a; border-radius: 7px;
+  background: #1e2d3d; color: #f8f7f4; font: inherit; font-size: 0.8rem;
+  cursor: pointer; white-space: nowrap; transition: background 0.2s ease, border-color 0.2s ease;
+}
+.manager-app .staff-table-actions button:hover { background: #2a374a; border-color: #e7c99a; }
+.manager-app .staff-empty-state {
+  padding: 30px !important; text-align: center; color: #aebbc9 !important;
+}
+.manager-app .staff-manage-panel {
+  background: #111c2e; border: 1px solid #344158; border-radius: 12px;
+  padding: 20px; margin-top: 18px;
+}
+.manager-app .staff-manage-panel h2 { color: #e7c99a; }
+.manager-app .staff-manage-panel p { color: #e3e7ee; overflow-wrap: anywhere; }
+.manager-app .staff-secondary-button {
+  border: 1px solid #48546a; border-radius: 8px; padding: 10px 15px;
+  background: #151f32; color: #f8f7f4; cursor: pointer; font: inherit;
+}
+.manager-app .staff-secondary-button:hover { border-color: #e4bd70; }
+@media (max-width: 900px) {
+  .manager-app .staff-reservations-table th,
+  .manager-app .staff-reservations-table td { padding: 9px 6px; }
+  .manager-app .staff-table-actions { gap: 4px; }
+  .manager-app .staff-table-actions button { padding: 7px 8px; font-size: 0.75rem; }
+}
+@media (max-width: 650px) {
+  .manager-app .staff-manage-toolbar { align-items: stretch; flex-direction: column; }
+  .manager-app .staff-manage-toolbar input { flex: 1 1 auto; max-width: none; }
+}
+
 .manager-app .manager-notifications {
   padding: 1rem;
   border: 1px solid #253249;
