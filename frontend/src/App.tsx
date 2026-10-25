@@ -245,14 +245,78 @@ function ResourcePage({ kind }: { kind: keyof typeof mediaEntityTypes }) {
 }
 
 function Reservations() {
-    const { user } = useAuth(); const manager = isManager(user); const [items, setItems] = useState<Reservation[]>([]); const [rooms, setRooms] = useState<Room[]>([]); const [tables, setTables] = useState<RestaurantTable[]>([]); const [selected, setSelected] = useState<Reservation | null>(null); const [history, setHistory] = useState<ReservationHistory[]>([]); const [type, setType] = useState("HOTEL"); const [statusFilter, setStatusFilter] = useState(""); const [error, setError] = useState(""); const [message, setMessage] = useState("");
+    const { user } = useAuth(); const navigate = useNavigate(); const manager = isManager(user); const [items, setItems] = useState<Reservation[]>([]); const [rooms, setRooms] = useState<Room[]>([]); const [tables, setTables] = useState<RestaurantTable[]>([]); const [selected, setSelected] = useState<Reservation | null>(null); const [history, setHistory] = useState<ReservationHistory[]>([]); const [type, setType] = useState("HOTEL"); const [statusFilter, setStatusFilter] = useState(""); const [category, setCategory] = useState<"Hotels" | "Dining">("Hotels"); const [error, setError] = useState(""); const [message, setMessage] = useState("");
     const [form, setForm] = useState<Record<string, string>>({});
     const load = () => apiGet<Reservation[]>(`/reservations${statusFilter ? `?status=${statusFilter}` : ""}`).then(setItems).catch(e => setError(e.message));
     useEffect(() => { load(); apiGet<Room[]>("/rooms").then(setRooms).catch(() => undefined); apiGet<RestaurantTable[]>("/tables").then(setTables).catch(() => undefined); }, [statusFilter]);
     const submit = async (event: FormEvent) => { event.preventDefault(); setError(""); setMessage(""); try { await apiPost("/reservations", { ...form, reservation_type: type, room_id: type === "HOTEL" ? Number(form.room_id) : null, table_id: type === "RESTAURANT" ? Number(form.table_id) : null }); setForm({}); setMessage("Reservation created"); load(); } catch (e) { setError(e instanceof Error ? e.message : "Reservation failed"); } };
     const show = async (item: Reservation) => { setSelected(item); try { setHistory(await apiGet<ReservationHistory[]>(`/reservations/${item.reservation_id}/history`)); } catch (e) { setError(e instanceof Error ? e.message : "History failed"); } };
     const status = async (item: Reservation, next: string) => { try { await apiPatch(`/reservations/${item.reservation_id}/status`, { status: next }); setMessage("Status updated"); load(); } catch (e) { setError(e instanceof Error ? e.message : "Status update failed"); } };
-    return <Page title="Reservations" error={error}>{message && <div className="alert success">{message}</div>}<div className="toolbar"><select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}><option value="">All statuses</option>{["Pending", "Confirmed", "Rejected", "Completed", "Cancelled"].map(s => <option key={s}>{s}</option>)}</select></div><div className="manager-reservations-table-wrap"><table className="manager-reservations-table"><thead><tr><th>Reservation</th><th>Guest</th><th>Property</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead><tbody>{items.map(item => { const room = rooms.find(r => r.room_id === item.room_id); const table = tables.find(t => t.table_id === item.table_id); return <tr key={item.reservation_id}><td><strong>#{item.reservation_id}</strong><small>{item.reservation_type}</small></td><td>{item.user ? `${item.user.first_name} ${item.user.last_name}` : "—"}</td><td><strong>{room?.hotel?.name ?? table?.restaurant?.name ?? "—"}</strong><small>{room ? `Room ${room.room_number}` : table ? `Table ${table.table_number}` : "—"}</small></td><td>{item.reservation_type === "HOTEL" ? item.check_in_date ?? "—" : item.reservation_date ?? "—"}<small>{item.reservation_type === "HOTEL" ? item.check_out_date ? `Until ${item.check_out_date}` : "" : item.start_time && item.end_time ? `${item.start_time}–${item.end_time}` : ""}</small></td><td><span className={`manager-status manager-status-${item.status.toLowerCase()}`}>{item.status}</span></td><td className="manager-reservations-actions"><button onClick={() => show(item)}>Details</button>{manager && item.status === "Pending" && <button onClick={() => status(item, "Confirmed")}>Confirm</button>}{manager && item.status === "Confirmed" && <button onClick={() => status(item, "Completed")}>Complete</button>}</td></tr>; })}</tbody></table>{!items.length && <p className="empty">No reservations found.</p>}</div><form hidden={!canCreateReservations(user)} className="form-panel reservation-form" onSubmit={submit}><h2>New reservation</h2><label>Type<select value={type} onChange={e => setType(e.target.value)}><option>HOTEL</option><option>RESTAURANT</option></select></label>{type === "HOTEL" ? <label>Room<select required value={form.room_id ?? ""} onChange={e => setForm({ ...form, room_id: e.target.value })}><option value="">Select room</option>{rooms.map(room => <option key={room.room_id} value={room.room_id}>{room.room_number} ({room.status})</option>)}</select></label> : <label>Table<select required value={form.table_id ?? ""} onChange={e => setForm({ ...form, table_id: e.target.value })}><option value="">Select table</option>{tables.map(table => <option key={table.table_id} value={table.table_id}>{table.table_number} ({table.status})</option>)}</select></label>}{type === "HOTEL" ? <><label>Check in<input required type="date" value={form.check_in_date ?? ""} onChange={e => setForm({ ...form, check_in_date: e.target.value })} /></label><label>Check out<input required type="date" value={form.check_out_date ?? ""} onChange={e => setForm({ ...form, check_out_date: e.target.value })} /></label></> : <><label>Date<input required type="date" value={form.reservation_date ?? ""} onChange={e => setForm({ ...form, reservation_date: e.target.value })} /></label><label>Start<input required type="time" value={form.start_time ?? ""} onChange={e => setForm({ ...form, start_time: e.target.value })} /></label><label>End<input required type="time" value={form.end_time ?? ""} onChange={e => setForm({ ...form, end_time: e.target.value })} /></label></>}<label>Special request<textarea value={form.special_request ?? ""} onChange={e => setForm({ ...form, special_request: e.target.value })} /></label><button type="submit">Create reservation</button></form>{selected && <div className="detail"><h2>Reservation {selected.reservation_id}</h2><p>Status: {selected.status}</p><h3>Status history</h3>{history.length ? <ul>{history.map(entry => <li key={entry.history_id}>{entry.status} at {entry.changed_at}: {entry.remarks ?? ""}</li>)}</ul> : <p>No history.</p>}<button onClick={() => setSelected(null)}>Close</button></div>}</Page>;
+    const hotelCount = items.filter(item => item.reservation_type === "HOTEL").length;
+    const diningCount = items.filter(item => item.reservation_type === "RESTAURANT").length;
+    const upcomingCount = items.filter(item => item.status === "Pending" || item.status === "Confirmed").length;
+    const displayed = items.filter(item => item.reservation_type === (category === "Hotels" ? "HOTEL" : "RESTAURANT"));
+    return <>
+        <section className="reservations-page">
+            <div className="reservations-heading">
+                <div><h1>Reservations</h1><p>Manage and monitor all reservations here.</p></div>
+                <Link to="/combined-bookings" className="combined-stay-button">+ Plan a Combined Stay</Link>
+            </div>
+            {message && <div className="alert success">{message}</div>}{error && <div className="alert error">{error}</div>}
+            <div className="reservation-stats">
+                <div className="stat-card"><span>Hotel Bookings</span><strong>{hotelCount}</strong></div>
+                <div className="stat-card"><span>Dining Reservations</span><strong>{diningCount}</strong></div>
+                <div className="stat-card"><span>Upcoming</span><strong className="upcoming-number">{upcomingCount}</strong></div>
+            </div>
+            <div className="reservation-toolbar">
+                <div className="reservation-tabs">
+                    {(["Hotels", "Dining"] as const).map(item => <button key={item} type="button" className={category === item ? "active" : ""} onClick={() => setCategory(item)}>{item}</button>)}
+                    <button type="button" onClick={() => navigate("/combined-bookings")}>Combined</button>
+                </div>
+                <select aria-label="Filter by reservation status" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
+                    <option value="">All Statuses</option>{["Pending", "Confirmed", "Rejected", "Cancelled", "Completed"].map(value => <option key={value}>{value}</option>)}
+                </select>
+            </div>
+            <div className="reservation-list">
+                {displayed.length ? displayed.map(item => {
+                    const room = rooms.find(candidate => candidate.room_id === item.room_id) ?? item.room;
+                    const table = tables.find(candidate => candidate.table_id === item.table_id) ?? item.restaurant_table;
+                    const hotel = room?.hotel;
+                    const restaurant = table?.restaurant;
+                    const isHotel = item.reservation_type === "HOTEL";
+                    const start = isHotel ? item.check_in_date : item.reservation_date;
+                    const end = isHotel ? item.check_out_date : item.end_time;
+                    const nightlyRate = isHotel && room?.price_per_night != null ? `₱${Number(room.price_per_night).toLocaleString("en-PH")} / night` : null;
+                    return <article className="reservation-card" key={item.reservation_id}>
+                        <div className="reservation-image-placeholder">{isHotel ? "Stay" : "Dining"}</div>
+                        <div className="reservation-details">
+                            <div className="reservation-card-heading">
+                                <div><h2>{hotel?.name ?? restaurant?.name ?? (isHotel ? `Room ${room?.room_number ?? "—"}` : `Table ${table?.table_number ?? "—"}`)}</h2><p>{hotel?.address ?? restaurant?.address ?? ""}</p></div>
+                                <span className={`reservation-status ${item.status.toLowerCase()}`}>{item.status}</span>
+                            </div>
+                            <div className="reservation-meta">
+                                <div><span>{isHotel ? "CHECK-IN" : "DATE"}</span><strong>{start?.slice(0, 10) ?? "—"}</strong></div>
+                                <div><span>{isHotel ? "CHECK-OUT" : "TIME"}</span><strong>{isHotel ? end?.slice(0, 10) ?? "—" : item.start_time && item.end_time ? `${item.start_time}–${item.end_time}` : "—"}</strong></div>
+                                <div><span>{isHotel ? "ROOM" : "TABLE"}</span><strong>{isHotel ? room?.room_type ?? room?.room_number ?? "—" : table?.table_number ?? "—"}</strong></div>
+                                {nightlyRate && <div><span>NIGHTLY RATE</span><strong>{nightlyRate}</strong></div>}
+                            </div>
+                            <div className="reservation-card-footer">
+                                <div className="reservation-price">{item.user ? `${item.user.first_name} ${item.user.last_name}` : "—"}</div>
+                                <div>
+                                    <button type="button" className="combined-stay-button" onClick={() => show(item)}>Details</button>
+                                    {manager && item.status === "Pending" && <button type="button" className="combined-stay-button" onClick={() => status(item, "Confirmed")}>Confirm</button>}
+                                    {manager && item.status === "Confirmed" && <button type="button" className="combined-stay-button" onClick={() => status(item, "Completed")}>Complete</button>}
+                                    {manager && item.status !== "Cancelled" && <button type="button" className="cancel-reservation-button" onClick={() => status(item, "Cancelled")}>Cancel</button>}
+                                </div>
+                            </div>
+                        </div>
+                    </article>;
+                }) : <div className="reservations-empty-state"><h2>No reservations found</h2><p>Try another category or status.</p></div>}
+            </div>
+        </section>
+        <form hidden={!canCreateReservations(user)} className="form-panel reservation-form" onSubmit={submit}><h2>New reservation</h2><label>Type<select value={type} onChange={e => setType(e.target.value)}><option>HOTEL</option><option>RESTAURANT</option></select></label>{type === "HOTEL" ? <label>Room<select required value={form.room_id ?? ""} onChange={e => setForm({ ...form, room_id: e.target.value })}><option value="">Select room</option>{rooms.map(room => <option key={room.room_id} value={room.room_id}>{room.room_number} ({room.status})</option>)}</select></label> : <label>Table<select required value={form.table_id ?? ""} onChange={e => setForm({ ...form, table_id: e.target.value })}><option value="">Select table</option>{tables.map(table => <option key={table.table_id} value={table.table_id}>{table.table_number} ({table.status})</option>)}</select></label>}{type === "HOTEL" ? <><label>Check in<input required type="date" value={form.check_in_date ?? ""} onChange={e => setForm({ ...form, check_in_date: e.target.value })} /></label><label>Check out<input required type="date" value={form.check_out_date ?? ""} onChange={e => setForm({ ...form, check_out_date: e.target.value })} /></label></> : <><label>Date<input required type="date" value={form.reservation_date ?? ""} onChange={e => setForm({ ...form, reservation_date: e.target.value })} /></label><label>Start<input required type="time" value={form.start_time ?? ""} onChange={e => setForm({ ...form, start_time: e.target.value })} /></label><label>End<input required type="time" value={form.end_time ?? ""} onChange={e => setForm({ ...form, end_time: e.target.value })} /></label></>}<label>Special request<textarea value={form.special_request ?? ""} onChange={e => setForm({ ...form, special_request: e.target.value })} /></label><button type="submit">Create reservation</button></form>
+        {selected && <div className="detail"><h2>Reservation {selected.reservation_id}</h2><p>Status: {selected.status}</p><h3>Status history</h3>{history.length ? <ul>{history.map(entry => <li key={entry.history_id}>{entry.status} at {entry.changed_at}: {entry.remarks ?? ""}</li>)}</ul> : <p>No history.</p>}<button onClick={() => setSelected(null)}>Close</button></div>}
+    </>;
 }
 
 function CombinedBookings() {
