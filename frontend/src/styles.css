@@ -386,3 +386,13 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .manager-app .hotel-room-card {
   grid-template-columns: minmax(0, 1fr) 125px;
 }
+.manager-app .table-wrap,
+.manager-app .table-wrap table,
+.manager-app .detail,
+.manager-app .report-block,
+.manager-app .form-panel,
+.manager-app .media-manager {
+  color: #1f2937;
+}
+.manager-app .table-wrap th { color: #1f2937; }
+.manager-app .empty { color: #c1c8d4; }
