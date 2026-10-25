@@ -380,3 +380,9 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; }
     justify-content: flex-start;
   }
 }
+.manager-app .sample-card {
+  color: #172033;
+}
+.manager-app .hotel-room-card {
+  grid-template-columns: minmax(0, 1fr) 125px;
+}

@@ -202,6 +202,104 @@ function Home() {
     return <CustomerHome />;
 }
 
+function Properties() {
+    const [hotels, setHotels] = useState<Hotel[]>([]); const [restaurants, setRestaurants] = useState<Restaurant[]>([]); const [rooms, setRooms] = useState<Room[]>([]); const [tables, setTables] = useState<RestaurantTable[]>([]);
+    const [search, setSearch] = useState(""); const [location, setLocation] = useState("all"); const [availability, setAvailability] = useState("all"); const [loading, setLoading] = useState(true); const [error, setError] = useState("");
+    useEffect(() => {
+        Promise.allSettled([apiGet<Hotel[]>("/hotels"), apiGet<Restaurant[]>("/restaurants"), apiGet<Room[]>("/rooms"), apiGet<RestaurantTable[]>("/tables")]).then(results => {
+            const [hotelResult, restaurantResult, roomResult, tableResult] = results;
+            if (hotelResult.status === "fulfilled") setHotels(hotelResult.value); else setError(hotelResult.reason instanceof Error ? hotelResult.reason.message : "Unable to load hotels");
+            if (restaurantResult.status === "fulfilled") setRestaurants(restaurantResult.value); else setError(restaurantResult.reason instanceof Error ? restaurantResult.reason.message : "Unable to load restaurants");
+            if (roomResult.status === "fulfilled") setRooms(roomResult.value);
+            if (tableResult.status === "fulfilled") setTables(tableResult.value);
+        }).finally(() => setLoading(false));
+    }, []);
+    const locations = [...new Set([...hotels, ...restaurants].map(item => item.address.split(",")[0].trim()).filter(Boolean))];
+    const matches = (item: Hotel | Restaurant, isHotel: boolean) => {
+        const available = isHotel ? rooms.some(room => room.hotel_id === (item as Hotel).hotel_id && room.status === "Available") : tables.some(table => table.restaurant_id === (item as Restaurant).restaurant_id && table.status === "Available");
+        return `${item.name} ${item.address} ${item.description ?? ""}`.toLowerCase().includes(search.toLowerCase())
+            && (location === "all" || item.address.toLowerCase().includes(location.toLowerCase()))
+            && (availability === "all" || (availability === "available" ? available : !available));
+    };
+    return <div className="app">
+        <main>
+            <section className="hero">
+                <p className="eyebrow">YOUR NEXT GETAWAY STARTS HERE</p>
+                <h1>Reserve Your Perfect Escape</h1>
+                <p className="hero-description">Discover comfortable stays and memorable dining experiences, all in one place.</p>
+                <div className="search-area">
+                    <form className="search-bar" onSubmit={event => event.preventDefault()}>
+                        <input value={search} onChange={event => setSearch(event.target.value)} type="text" placeholder="Search hotels or restaurants..." aria-label="Search hotels or restaurants" />
+                        <button type="submit">Search</button>
+                    </form>
+                    <div className="filter-bar">
+                        <label>Location<select value={location} onChange={event => setLocation(event.target.value)}><option value="all">All Locations</option>{locations.map(value => <option value={value} key={value}>{value}</option>)}</select></label>
+                        <label>Availability<select value={availability} onChange={event => setAvailability(event.target.value)}><option value="all">Any Availability</option><option value="available">Available</option><option value="unavailable">Unavailable</option></select></label>
+                    </div>
+                </div>
+            </section>
+            {error && <div className="alert error" role="alert">{error}</div>}
+            <section className="listing-section" id="hotels">
+                <div className="section-heading"><div><p className="eyebrow">HANDPICKED FOR YOU</p><h2>Explore Places to Stay</h2></div></div>
+                {loading ? <p>Loading hotels...</p> : <div className="sample-listings">
+                    {hotels.filter(item => matches(item, true)).map(hotel => {
+                        const lowestPrice = rooms.filter(room => room.hotel_id === hotel.hotel_id).reduce<number | null>((lowest, room) => lowest === null || room.price_per_night < lowest ? room.price_per_night : lowest, null);
+                        return <article className="sample-card" key={hotel.hotel_id}><div className="sample-card-body"><p className="eyebrow">HOTEL · {hotel.status}</p><h3>{hotel.name}</h3><p>{hotel.address}</p>{hotel.description && <p>{hotel.description}</p>}{lowestPrice !== null && <p className="sample-price">₱{Number(lowestPrice).toLocaleString("en-PH")} <span>/ night</span></p>}<Link to={`/hotels/${hotel.hotel_id}`} className="signup-button">View Hotel</Link></div></article>;
+                    })}
+                </div>}
+                {!loading && hotels.filter(item => matches(item, true)).length === 0 && <p>No hotels match these filters.</p>}
+            </section>
+            <section className="listing-section" id="restaurants">
+                <div className="section-heading"><div><p className="eyebrow">HANDPICKED FOR YOU</p><h2>Explore Restaurants</h2></div></div>
+                {loading ? <p>Loading restaurants...</p> : <div className="sample-listings">
+                    {restaurants.filter(item => matches(item, false)).map(restaurant => <article className="sample-card" key={restaurant.restaurant_id}><div className="sample-card-body"><p className="eyebrow">RESTAURANT · {restaurant.status}</p><h3>{restaurant.name}</h3><p>{restaurant.address}</p>{restaurant.description && <p>{restaurant.description}</p>}<Link to={`/restaurants/${restaurant.restaurant_id}`} className="signup-button">View Restaurant</Link></div></article>)}
+                </div>}
+                {!loading && restaurants.filter(item => matches(item, false)).length === 0 && <p>No restaurants match these filters.</p>}
+            </section>
+            <section className="combined-cta"><p className="eyebrow">MAKE IT A COMPLETE EXPERIENCE</p><h2>Stay, Dine, and Enjoy</h2><p>Plan your accommodation and dining experience together in one place.</p><Link to="/reservations" className="signup-button">Plan a Combined Stay</Link></section>
+        </main>
+    </div>;
+}
+
+function PropertyDetailsRoute() {
+    const { user } = useAuth();
+    return isManager(user) ? <StaffPropertyDetails /> : <HotelDetails />;
+}
+
+function RestaurantDetailsRoute() {
+    const { user } = useAuth();
+    return isManager(user) ? <StaffPropertyDetails restaurantMode /> : <RestaurantDetails />;
+}
+
+function StaffPropertyDetails({ restaurantMode = false }: { restaurantMode?: boolean }) {
+    const { hotelId, restaurantId } = useParams();
+    const [hotel, setHotel] = useState<Hotel | null>(null); const [restaurant, setRestaurant] = useState<Restaurant | null>(null); const [rooms, setRooms] = useState<Room[]>([]); const [tables, setTables] = useState<RestaurantTable[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState("");
+    const id = Number(restaurantMode ? restaurantId : hotelId);
+    useEffect(() => {
+        const propertyRequest = restaurantMode ? apiGet<Restaurant>(`/restaurants/${id}`).then(setRestaurant) : apiGet<Hotel>(`/hotels/${id}`).then(setHotel);
+        const inventoryRequest = restaurantMode ? apiGet<RestaurantTable[]>("/tables").then(setTables) : apiGet<Room[]>("/rooms").then(setRooms);
+        Promise.all([propertyRequest, inventoryRequest]).catch(caught => setError(caught instanceof Error ? caught.message : "Unable to load property")).finally(() => setLoading(false));
+    }, [id, restaurantMode]);
+    const property = restaurantMode ? restaurant : hotel;
+    const propertyRooms = rooms.filter(room => room.hotel_id === id);
+    const propertyTables = tables.filter(table => table.restaurant_id === id);
+    return <section className="restaurant-detail-page">
+        <Link to="/properties">← Back to Hotels &amp; Restaurants</Link>
+        {loading ? <p>Loading property...</p> : error ? <div className="alert error" role="alert">{error}</div> : property && <>
+            <div className="restaurant-detail-heading"><div><p className="eyebrow">{restaurantMode ? "RESTAURANT" : "HOTEL"} · {property.status}</p><h1>{property.name}</h1><p>{property.address}</p></div></div>
+            {property.description && <p className="restaurant-detail-description">{property.description}</p>}
+            <p className="restaurant-detail-description">{property.contact_number}{property.email ? ` · ${property.email}` : ""}</p>
+            <section className="hotel-rooms-section">
+                <div className="hotel-rooms-heading"><div><p className="eyebrow">PROPERTY INVENTORY</p><h2>{restaurantMode ? "Tables" : "Rooms"}</h2></div><span>{restaurantMode ? propertyTables.length : propertyRooms.length} {restaurantMode ? "tables" : "rooms"}</span></div>
+                <div className="hotel-room-list">
+                    {restaurantMode ? propertyTables.map(table => <article className="hotel-room-card" key={table.table_id}><div className="hotel-room-info"><h3>Table {table.table_number}</h3><small>Capacity {table.capacity}</small></div><div className="hotel-room-booking"><span className={`hotel-room-status ${table.status === "Available" ? "is-available" : "is-booked"}`}>{table.status}</span></div></article>) : propertyRooms.map(room => <article className="hotel-room-card" key={room.room_id}><div className="hotel-room-info"><h3>{room.room_type} · Room {room.room_number}</h3><small>Capacity {room.capacity}</small></div><div className="hotel-room-booking"><span className={`hotel-room-status ${room.status === "Available" ? "is-available" : "is-booked"}`}>{room.status}</span><strong>₱{Number(room.price_per_night).toLocaleString("en-PH")}<small>/ night</small></strong></div></article>)}
+                    {restaurantMode && propertyTables.length === 0 && <p>No tables found.</p>}{!restaurantMode && propertyRooms.length === 0 && <p>No rooms found.</p>}
+                </div>
+            </section>
+        </>}
+    </section>;
+}
+
 function HotelCatalogRoute() {
     const { user } = useAuth();
     return isManager(user) ? <ResourcePage kind="hotels" /> : <HotelDiscovery />;
@@ -549,5 +647,5 @@ function Profile() {
 }
 
 export function App() {
-    return <Routes><Route path="/login" element={<AuthPage />} /><Route path="/register" element={<AuthPage registerMode />} /><Route path="/forgot-password" element={<ForgotPassword />} /><Route path="/reset-password" element={<ResetPassword />} /><Route path="*" element={<Protected><AppLayout><Routes><Route path="/" element={<LandingRedirect />} /><Route path="/home" element={<Home />} /><Route path="/dashboard" element={<RoleRoute roles={["Staff", "Admin"]}><Dashboard /></RoleRoute>} /><Route path="/hotels" element={<HotelCatalogRoute />} /><Route path="/hotels/:hotelId" element={<HotelDetails />} /><Route path="/restaurants" element={<RestaurantCatalogRoute />} /><Route path="/restaurants/:restaurantId" element={<RestaurantDetails />} /><Route path="/rooms" element={<RoleRoute roles={["Staff", "Admin"]}><ResourcePage kind="rooms" /></RoleRoute>} /><Route path="/tables" element={<RoleRoute roles={["Staff", "Admin"]}><ResourcePage kind="tables" /></RoleRoute>} /><Route path="/reservations" element={<ReservationsRoute />} /><Route path="/manage" element={<RoleRoute roles={["Staff", "Admin"]}><Reservations manageView /></RoleRoute>} /><Route path="/combined-bookings" element={<CombinedBookingsRoute />} /><Route path="/reports" element={<RoleRoute roles={["Staff", "Admin"]}><Reports /></RoleRoute>} /><Route path="/users" element={<RoleRoute roles={["Admin"]}><Users /></RoleRoute>} /><Route path="/notifications" element={<Notifications />} /><Route path="/profile" element={<Profile />} /><Route path="*" element={<Navigate to="/home" replace />} /></Routes></AppLayout></Protected>} /></Routes>;
+    return <Routes><Route path="/login" element={<AuthPage />} /><Route path="/register" element={<AuthPage registerMode />} /><Route path="/forgot-password" element={<ForgotPassword />} /><Route path="/reset-password" element={<ResetPassword />} /><Route path="*" element={<Protected><AppLayout><Routes><Route path="/" element={<LandingRedirect />} /><Route path="/home" element={<Home />} /><Route path="/dashboard" element={<RoleRoute roles={["Staff", "Admin"]}><Dashboard /></RoleRoute>} /><Route path="/properties" element={<RoleRoute roles={["Staff", "Admin"]}><Properties /></RoleRoute>} /><Route path="/hotels" element={<HotelCatalogRoute />} /><Route path="/hotels/:hotelId" element={<PropertyDetailsRoute />} /><Route path="/restaurants" element={<RestaurantCatalogRoute />} /><Route path="/restaurants/:restaurantId" element={<RestaurantDetailsRoute />} /><Route path="/rooms" element={<RoleRoute roles={["Staff", "Admin"]}><ResourcePage kind="rooms" /></RoleRoute>} /><Route path="/tables" element={<RoleRoute roles={["Staff", "Admin"]}><ResourcePage kind="tables" /></RoleRoute>} /><Route path="/reservations" element={<ReservationsRoute />} /><Route path="/manage" element={<RoleRoute roles={["Staff", "Admin"]}><Reservations manageView /></RoleRoute>} /><Route path="/combined-bookings" element={<CombinedBookingsRoute />} /><Route path="/reports" element={<RoleRoute roles={["Staff", "Admin"]}><Reports /></RoleRoute>} /><Route path="/users" element={<RoleRoute roles={["Admin"]}><Users /></RoleRoute>} /><Route path="/notifications" element={<Notifications />} /><Route path="/profile" element={<Profile />} /><Route path="*" element={<Navigate to="/home" replace />} /></Routes></AppLayout></Protected>} /></Routes>;
 }
