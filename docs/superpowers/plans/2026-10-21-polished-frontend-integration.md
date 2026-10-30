@@ -13,19 +13,21 @@
 ## Global Constraints
 
 - The frontend build stays in `frontend/` and uses `VITE_API_BASE_URL`.
-- Keep `frontend/src/api.ts`, `frontend/src/auth.tsx`, token handling, route guards, password recovery, and backend contracts as the source of truth.
+- Keep `frontend/src/api.ts`, `frontend/src/auth.tsx`, the HttpOnly cookie-session flow, CSRF handling, route guards, password recovery, and backend contracts as the source of truth. Do not add bearer-token or browser-storage token handling.
 - Customer, Staff, and Admin can create reservations and combined bookings; only Staff and Admin can change reservation status.
 - Show loading, empty, success, and API error states; do not fall back to mock records.
+- Resource routes require authentication, so discovery remains behind the existing sign-in gate.
+- Display only backend-provided fields; do not invent ratings, amenities, restaurant prices, or date availability.
 - Do not change database schema, Supabase RLS policies, backend permissions, or deployment configuration.
 - Do not commit, push, or deploy without explicit user authorization.
 
 ## Review Focus
 
-- Unauthenticated access to booking/account routes redirects to the real login flow; test by opening a protected route with no token.
+- Unauthenticated access to booking/account routes redirects to the real login flow; test by opening a protected route without a valid session cookie.
 - Auth success/failure uses the backend session; test invalid credentials and valid account sign-in without setting prototype session flags.
 - Empty or failed resource reads never show prototype sample listings; test empty API data and a failed API request.
-- Reservation mutation is persisted through API and respects permissions; test customer create and confirm status controls are hidden for Customer.
-- Recovery links preserve the existing Supabase token handling; test the complete flow only with a fresh recovery link after user testing is scheduled.
+- Reservation creation is persisted through API and respects permissions; test customer create and verify customer status controls are absent.
+- Recovery links exchange Supabase link tokens through the backend, remove them from the URL, and do not persist them in the browser; test the complete flow only with a fresh recovery link after user testing is scheduled.
 
 ---
 
@@ -34,7 +36,6 @@
 **Files:**
 - Create: `frontend/src/components/CustomerLayout.tsx`
 - Create: `frontend/src/components/CustomerHome.tsx`
-- Create: `frontend/src/components/CustomerDiscovery.tsx`
 - Modify: `frontend/src/App.tsx`
 - Modify: `frontend/src/styles.css`
 - Copy/adapt visual assets from `origin/frontend-pages:reservation-system/{App.css,hero.png,icons.svg}` into `frontend/src/assets/`
@@ -55,16 +56,20 @@
 - Create: `frontend/src/components/RestaurantDiscovery.tsx`
 - Create: `frontend/src/components/HotelDetails.tsx`
 - Create: `frontend/src/components/RestaurantDetails.tsx`
+- Create: `frontend/src/customerData.ts` (pure display/search helpers)
+- Create: `frontend/tests/customerData.test.ts`
+- Modify: `frontend/package.json` to add the built-in Node test command if required
 - Modify: `frontend/src/App.tsx`
 - Modify: `frontend/src/types.ts` only if response fields require safe optional typing
 - Reuse: `frontend/src/api.ts`, `frontend/src/styles.css`
 
 **Interfaces:**
 - Consumes: `apiGet<T>()`; existing `Hotel`, `Restaurant`, `Room`, `RestaurantTable`, and `Media` types.
-- Produces: discovery/detail views loaded from `/hotels`, `/restaurants`, `/rooms`, `/tables`, and `/media` API routes.
+- Produces: authenticated discovery/detail views loaded from `/hotels`, `/restaurants`, `/rooms`, `/tables`, and `/media` API routes. Filter rooms by `hotel_id` and tables by `restaurant_id` on the client because those routes do not accept parent IDs.
 
 - [ ] Implement hotel and restaurant search/filter against returned records; remove fabricated static records and fake ratings/prices that do not exist in backend data.
 - [ ] Load detail records and associated rooms/tables/media using the existing API routes and actual IDs.
+- [ ] Use actual room `price_per_night`; omit prototype ratings, amenity lists, fixed restaurant prices, and unsupported date-specific availability claims.
 - [ ] Render loading, empty, not-found, and API error states; verify backend failure does not render prototype data.
 - [ ] Verify links navigate by real resource IDs and do not rely on demo slugs.
 
@@ -85,6 +90,8 @@
 
 - [ ] Replace prototype sessionStorage authentication with the existing `AuthProvider`.
 - [ ] Connect customer booking submission and reservation/history lists to existing APIs; preserve real server-side dates, statuses, and ownership behavior.
+- [ ] Submit hotel reservations with `room_id`, dates, and `reservation_type: "HOTEL"`; restaurant reservations with `table_id`, date, times, and `reservation_type: "RESTAURANT"`.
+- [ ] Submit combined bookings through `/combined-bookings/hotel-restaurant` with the backend's nested hotel and restaurant payload.
 - [ ] Connect combined booking and profile forms to their current API endpoints; keep password recovery token handling intact.
 - [ ] Test the review-focus cases for real auth, API failure, empty lists, customer booking permissions, and role-based status controls.
 
@@ -104,4 +111,4 @@
 - [ ] Verify Customer, Staff, and Admin reservation creation access and Admin/Staff-only status mutation controls.
 - [ ] Run `npm run build` from `frontend/`; expected result is a successful TypeScript and Vite production build.
 - [ ] Prepare a concise manual sequence for the user to verify login, database-backed listing reads, one CRUD flow, and role-based business rules on the live deployment.
-- [ ] Do not run live dashboard/database operations or deploy; hand the user the tested local result and checklist.
+- [ ] Do not run live dashboard/database operations; hand the user the integrated build and one-step-at-a-time live test checklist.
