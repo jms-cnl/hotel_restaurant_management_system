@@ -1,14 +1,26 @@
 import { Router } from "express";
-import { changePasswordController, forgotPasswordController, loginController, logoutController, registerController, resetPasswordController } from "../controllers/auth.controller.js";
-import { authenticate, requireRecoveryToken } from "../middleware/auth.middleware.js";
+import {
+    changePasswordController, forgotPasswordController, loginController, logoutController,
+    csrfController, recoveryCsrfController, recoveryExchangeController, recoverySessionController,
+    registerController, resetPasswordController, sessionStatusController
+} from "../controllers/auth.controller.js";
+import {
+    authenticate, authenticateBootstrap, authenticateRecovery, authenticateRecoveryBootstrap, requireRecoverySession
+} from "../middleware/auth.middleware.js";
+import { requireTrustedOrigin } from "../middleware/csrf.middleware.js";
 
 const router = Router();
 
 router.post("/register", registerController);
 router.post("/login", loginController);
-router.post("/logout", authenticate, logoutController);
+router.get("/session", authenticate, sessionStatusController);
+router.post("/csrf", requireTrustedOrigin, authenticateBootstrap, csrfController);
+router.post("/logout", authenticateRecovery, logoutController);
 router.post("/change-password", authenticate, changePasswordController);
 router.post("/forgot-password", forgotPasswordController);
-router.post("/reset-password", authenticate, requireRecoveryToken, resetPasswordController);
+router.post("/recovery/exchange", requireTrustedOrigin, recoveryExchangeController);
+router.get("/recovery/session", authenticateRecovery, requireRecoverySession, recoverySessionController);
+router.post("/recovery/csrf", requireTrustedOrigin, authenticateRecoveryBootstrap, requireRecoverySession, recoveryCsrfController);
+router.post("/reset-password", authenticateRecovery, requireRecoverySession, resetPasswordController);
 
 export default router;

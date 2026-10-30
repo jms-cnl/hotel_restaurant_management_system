@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useNavigate, useParams } from "react-router-dom";
-import { apiDelete, apiGet, apiPatch, apiPost, apiPut, apiUpload, setToken } from "./api";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut, apiUpload, reportMeaningfulActivity } from "./api";
+import { authSession } from "./auth-session";
 import { useAuth } from "./auth";
 import { CustomerHome } from "./components/CustomerHome";
 import { CustomerLayout } from "./components/CustomerLayout";
@@ -33,9 +34,10 @@ function RoleRoute({ roles, children }: { roles: string[]; children: ReactNode }
 }
 
 function AppLayout({ children }: { children: ReactNode }) {
-    const { user, logout } = useAuth();
+    const { user, logout, sessionWarning } = useAuth();
     const navigate = useNavigate();
-    if (!isManager(user)) return <CustomerLayout>{children}</CustomerLayout>;
+    const warning = sessionWarning && <div className="alert error" role="status">Your session will expire in two minutes due to inactivity. Save your work.</div>;
+    if (!isManager(user)) return <CustomerLayout>{warning}{children}</CustomerLayout>;
     const staffName = userName(user);
     return <div className="manager-app customer-app">
         <header className="customer-navbar">
@@ -68,7 +70,7 @@ function AppLayout({ children }: { children: ReactNode }) {
                 </button>
             </div>
         </header>
-        <main className="customer-main">{children}</main>
+        <main className="customer-main">{warning}{children}</main>
     </div>;
 }
 
@@ -354,9 +356,69 @@ function ForgotPassword() {
 
 function ResetPassword() {
     const navigate = useNavigate(); const [newPassword, setNewPassword] = useState(""); const [confirmPassword, setConfirmPassword] = useState(""); const [error, setError] = useState(""); const [message, setMessage] = useState(""); const [loading, setLoading] = useState(true);
-    useEffect(() => { const params = new URLSearchParams(window.location.hash.replace(/^#/, "")); const accessToken = params.get("access_token"); if (!accessToken || params.get("type") !== "recovery") setError("This password reset link is invalid or expired."); else setToken(accessToken); setLoading(false); }, []);
-    const submit = async (event: FormEvent) => { event.preventDefault(); setError(""); if (passwordErrors(newPassword).length) { setError(`Password does not meet the requirements: ${passwordErrors(newPassword).join(", ")}`); return; } if (newPassword !== confirmPassword) { setError("Password confirmation does not match"); return; } setLoading(true); try { const result = await apiPost<{ message: string }>("/auth/reset-password", { new_password: newPassword }); setMessage(result.message); setToken(null); } catch (e) { setError(e instanceof Error ? e.message : "Reset session is invalid or expired"); } finally { setLoading(false); } };
-    return <main className="auth-page"><form className="auth-card" onSubmit={submit}><Link to="/login" className="auth-brand">StayEase</Link><p className="auth-eyebrow">ACCOUNT RECOVERY</p><h1>Set a new password</h1>{error && <div className="alert error" role="alert">{error}</div>}{message ? <><div className="alert success" role="status">{message}</div><button className="auth-button" type="button" onClick={() => navigate("/login")}>Back to login</button></> : <>{!loading && <div className="auth-form"><label>New password<input type="password" autoComplete="new-password" required value={newPassword} onChange={e => setNewPassword(e.target.value)} /></label><PasswordRequirements password={newPassword} /><label>Confirm password<input type="password" autoComplete="new-password" required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} /></label><button className="auth-button" disabled={loading} type="submit">Update password</button></div>}</>}</form></main>;
+    const [sessionWarning, setSessionWarning] = useState(false);
+    const [recoveryRole, setRecoveryRole] = useState("");
+    const [recoveryExpiresAt, setRecoveryExpiresAt] = useState<number | null>(null);
+    useEffect(() => {
+        let active = true;
+        const initialize = async () => {
+            try {
+                const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+                const accessToken = params.get("access_token");
+                const refreshToken = params.get("refresh_token");
+                if (accessToken || refreshToken) {
+                    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+                    if (!accessToken || !refreshToken || params.get("type") !== "recovery") throw new Error("This password reset link is invalid or expired.");
+                }
+                const recovery = await authSession.recover(accessToken && refreshToken && params.get("type") === "recovery"
+                    ? { access_token: accessToken, refresh_token: refreshToken }
+                    : null);
+                if (active) {
+                    setRecoveryRole(recovery.profile.role_name);
+                    setRecoveryExpiresAt(recovery.expiresAt);
+                }
+            } catch (caught) {
+                if (active) setError(caught instanceof Error ? caught.message : "This password reset link is invalid or expired.");
+            } finally {
+                if (active) setLoading(false);
+            }
+        };
+        void initialize();
+        return () => { active = false; };
+    }, []);
+    useEffect(() => {
+        if (recoveryExpiresAt === null) return;
+        const warningTimer = window.setTimeout(() => setSessionWarning(true), Math.max(0, recoveryExpiresAt - Date.now() - 2 * 60_000));
+        return () => window.clearTimeout(warningTimer);
+    }, [recoveryExpiresAt]);
+    useEffect(() => {
+        if (!recoveryRole) return;
+        let lastReportedAt = 0;
+        let requestPending = false;
+        const onUserInput = () => {
+            const now = Date.now();
+            if (requestPending || now - lastReportedAt < 60_000) return;
+            requestPending = true;
+            lastReportedAt = now;
+            void reportMeaningfulActivity(true).then(() => {
+                const minutes = recoveryRole.toLowerCase() === "customer" ? 30 : 15;
+                setRecoveryExpiresAt(Date.now() + minutes * 60_000);
+                setSessionWarning(false);
+            }).catch(() => undefined).finally(() => { requestPending = false; });
+        };
+        window.addEventListener("pointerdown", onUserInput, { passive: true });
+        window.addEventListener("keydown", onUserInput);
+        window.addEventListener("touchstart", onUserInput, { passive: true });
+        window.addEventListener("wheel", onUserInput, { passive: true });
+        return () => {
+            window.removeEventListener("pointerdown", onUserInput);
+            window.removeEventListener("keydown", onUserInput);
+            window.removeEventListener("touchstart", onUserInput);
+            window.removeEventListener("wheel", onUserInput);
+        };
+    }, [recoveryRole]);
+    const submit = async (event: FormEvent) => { event.preventDefault(); setError(""); if (passwordErrors(newPassword).length) { setError(`Password does not meet the requirements: ${passwordErrors(newPassword).join(", ")}`); return; } if (newPassword !== confirmPassword) { setError("Password confirmation does not match"); return; } setLoading(true); try { const result = await apiPost<{ message: string }>("/auth/reset-password", { new_password: newPassword }); setMessage(result.message); } catch (e) { setError(e instanceof Error ? e.message : "Reset session is invalid or expired"); } finally { setLoading(false); } };
+    return <main className="auth-page"><form className="auth-card" onSubmit={submit}><Link to="/login" className="auth-brand">StayEase</Link><p className="auth-eyebrow">ACCOUNT RECOVERY</p><h1>Set a new password</h1>{sessionWarning && <div className="alert error" role="status">Your recovery session will expire in two minutes. Save your work.</div>}{error && <div className="alert error" role="alert">{error}</div>}{message ? <><div className="alert success" role="status">{message}</div><button className="auth-button" type="button" onClick={() => navigate("/login")}>Back to login</button></> : <>{!loading && <div className="auth-form"><label>New password<input type="password" autoComplete="new-password" required value={newPassword} onChange={e => setNewPassword(e.target.value)} /></label><PasswordRequirements password={newPassword} /><label>Confirm password<input type="password" autoComplete="new-password" required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} /></label><button className="auth-button" disabled={loading} type="submit">Update password</button></div>}</>}</form></main>;
 }
 
 function LandingRedirect() {

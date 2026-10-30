@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - The frontend build stays in `frontend/` and uses `VITE_API_BASE_URL`.
-- Keep `frontend/src/api.ts`, `frontend/src/auth.tsx`, token handling, route guards, password recovery, and backend contracts as the source of truth.
+- Keep `frontend/src/api.ts`, `frontend/src/auth.tsx`, the HttpOnly cookie-session flow, CSRF handling, route guards, password recovery, and backend contracts as the source of truth. Do not add bearer-token or browser-storage token handling.
 - Customer, Staff, and Admin can create reservations and combined bookings; only Staff and Admin can change reservation status.
 - Show loading, empty, success, and API error states; do not fall back to mock records.
 - Resource routes require authentication, so discovery remains behind the existing sign-in gate.
@@ -23,11 +23,11 @@
 
 ## Review Focus
 
-- Unauthenticated access to booking/account routes redirects to the real login flow; test by opening a protected route with no token.
+- Unauthenticated access to booking/account routes redirects to the real login flow; test by opening a protected route without a valid session cookie.
 - Auth success/failure uses the backend session; test invalid credentials and valid account sign-in without setting prototype session flags.
 - Empty or failed resource reads never show prototype sample listings; test empty API data and a failed API request.
 - Reservation creation is persisted through API and respects permissions; test customer create and verify customer status controls are absent.
-- Recovery links preserve the existing Supabase token handling; test the complete flow only with a fresh recovery link after user testing is scheduled.
+- Recovery links exchange Supabase link tokens through the backend, remove them from the URL, and do not persist them in the browser; test the complete flow only with a fresh recovery link after user testing is scheduled.
 
 ---
 

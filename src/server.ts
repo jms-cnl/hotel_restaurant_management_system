@@ -12,34 +12,12 @@ import restaurantRouter from "./routes/restaurant.routes.js";
 import roomRouter from "./routes/room.routes.js";
 import tableRouter from "./routes/table.routes.js";
 import userRouter from "./routes/user.routes.js";
+import { createCorsMiddleware, parseAllowedOrigins } from "./middleware/cors.middleware.js";
 
 
 const app = express();
 
-const allowedOrigins = new Set(
-  (process.env.CORS_ORIGINS ?? "").split(",").map((origin) => origin.trim()).filter(Boolean)
-);
-
-app.use((req, res, next) => {
-  const origin = req.get("Origin");
-  if (!origin) { next(); return; }
-
-  res.vary("Origin");
-  if (!allowedOrigins.has(origin)) {
-    if (req.method === "OPTIONS") { res.sendStatus(403); return; }
-    next();
-    return;
-  }
-
-  res.setHeader("Access-Control-Allow-Origin", origin);
-  if (req.method === "OPTIONS") {
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Authorization,Content-Type");
-    res.sendStatus(204);
-    return;
-  }
-  next();
-});
+app.use(createCorsMiddleware(parseAllowedOrigins()));
 
 app.use(express.json());
 

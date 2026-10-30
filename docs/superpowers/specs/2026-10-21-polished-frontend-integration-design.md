@@ -16,13 +16,13 @@ Integrate the colleague-built polished customer interface from the `frontend-pag
 
 ## Integration approach
 
-Port the polished customer-facing layouts and visual assets into `frontend/src`, adapting the existing React components rather than deploying the prototype as a second app. Keep the current `frontend/src/api.ts`, `frontend/src/auth.tsx`, token handling, route guards, password recovery flow, and backend contracts as the source of truth for server communication. The prototype's demo login and registration must be replaced by the existing AuthProvider.
+Port the polished customer-facing layouts and visual assets into `frontend/src`, adapting the existing React components rather than deploying the prototype as a second app. Keep the current `frontend/src/api.ts`, `frontend/src/auth.tsx`, HttpOnly cookie-session flow, CSRF handling, route guards, password recovery flow, and backend contracts as the source of truth for server communication. Do not add bearer-token or browser-storage token handling. The prototype's demo login and registration must be replaced by the existing AuthProvider.
 
 Replace prototype/sample listing data with API responses. Connect hotel and restaurant discovery/details, reservation creation and history, combined bookings, profile, and auth screens to the current endpoints. Use actual IDs for detail routes. Display only backend fields (for example, room nightly price) and do not invent ratings, amenity lists, per-person restaurant prices, or date availability that the backend does not provide. Preserve the existing Admin and Staff dashboard and management routes; apply the polished design language where it fits without removing their current functions.
 
 ## Data and access behavior
 
-- Resource reads and writes go through the existing API client and authenticated bearer token.
+- Resource reads and writes go through the existing session-aware API client using the HttpOnly cookie session; state-changing requests include the session-bound CSRF token.
 - Customer, Staff, and Admin retain the currently established ability to create reservations and combined bookings.
 - Only Staff and Admin can change reservation status; the customer reservation view is read-only after submission.
 - The frontend must show loading, empty, success, and API error states rather than substituting mock records when a request fails.
