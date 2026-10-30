@@ -81,12 +81,13 @@ export const sessionStatusController = async (req: Request, res: Response) => {
 export const logoutController = async (req: Request, res: Response) => {
     try {
         await logoutUser(req);
-        res.status(204).send();
     } catch {
-        res.status(503).json({ message: "Unable to revoke the current session" });
-    } finally {
         clearSessionCookie(res);
+        res.status(503).json({ message: "Unable to revoke the current session" });
+        return;
     }
+    clearSessionCookie(res);
+    res.status(204).send();
 };
 
 export const changePasswordController = async (req: Request, res: Response) => {

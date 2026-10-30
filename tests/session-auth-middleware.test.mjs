@@ -20,13 +20,14 @@ function makeResponse() {
     return {
         statusCode: undefined,
         body: undefined,
+        cookies: [],
         status(code) { this.statusCode = code; return this; },
         json(body) { this.body = body; return this; },
-        cookie() { return this; }
+        cookie(...args) { this.cookies.push(args); return this; }
     };
 }
 
-function makeReq({ method = "GET", cookie = `hrm_session=${cookieSecret}`, authorization } = {}) {
+function makeReq({ method = "GET", cookie = `hrm_session=${cookieSecret}`, authorization, path = "/api/users/me", originalUrl = path, baseUrl = "" } = {}) {
     const headers = {};
     if (cookie !== null && cookie !== undefined) headers.cookie = cookie;
     if (authorization) headers.authorization = authorization;
@@ -34,7 +35,9 @@ function makeReq({ method = "GET", cookie = `hrm_session=${cookieSecret}`, autho
         method,
         headers,
         get(name) { return headers[name.toLowerCase()]; },
-        path: "/api/users/me",
+        path,
+        originalUrl,
+        baseUrl,
         body: {},
         query: {},
         params: {}
@@ -218,4 +221,40 @@ test("valid state-changing requests extend idle activity using the current profi
     await middleware(req, res, () => { continued = true; });
     assert.equal(continued, true);
     assert.deepEqual(activity, [[sessionId, "Admin", now]]);
+});
+
+test("logout and password reset do not refresh the cookie or extend session activity", async () => {
+    for (const path of ["/api/auth/logout", "/api/auth/reset-password"]) {
+        const activity = [];
+        const { dependencies } = makeDependencies({
+            recordMeaningfulActivity: async (...args) => { activity.push(args); return true; }
+        });
+        const middleware = createAuthenticationMiddleware({ allowRecovery: true }, dependencies);
+        const req = makeReq({ method: "POST", path, originalUrl: path });
+        req.headers["x-csrf-token"] = csrfSecret;
+        const res = makeResponse();
+        let continued = false;
+
+        await middleware(req, res, () => { continued = true; });
+
+        assert.equal(continued, true, `${path} should reach its revocation controller`);
+        assert.deepEqual(activity, [], `${path} must not extend session activity`);
+        assert.deepEqual(res.cookies, [], `${path} must not re-issue the session cookie`);
+    }
+});
+
+test("session refresh cookie max-age follows the authenticated role idle timeout", async () => {
+    for (const [roleName, expectedMaxAge] of [["Customer", 1_800_000], ["Staff", 900_000], ["Admin", 900_000]]) {
+        const { dependencies } = makeDependencies({
+            getProfile: async () => ({ profile: { user_id: userId, role_id: 1, role: { role_name: roleName } }, error: null })
+        });
+        const middleware = createAuthenticationMiddleware({}, dependencies);
+        const req = makeReq({ method: "POST" });
+        req.headers["x-csrf-token"] = csrfSecret;
+        const res = makeResponse();
+
+        await middleware(req, res, () => undefined);
+
+        assert.equal(res.cookies[0][2].maxAge, expectedMaxAge, `${roleName} cookie max-age`);
+    }
 });

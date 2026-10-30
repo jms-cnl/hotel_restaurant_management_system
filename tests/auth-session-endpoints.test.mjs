@@ -55,6 +55,8 @@ test("login cookie is HttpOnly and logout clears the same cookie configuration",
     assert.equal(calls[0][3].httpOnly, true);
     assert.equal(calls[1][1], "hrm_session");
     assert.equal(calls[1][2].httpOnly, true);
+    const { maxAge: _maxAge, ...issuedOptions } = calls[0][3];
+    assert.deepEqual(calls[1][2], issuedOptions);
 });
 
 test("logout revokes only the session attached to the current request", async () => {
@@ -67,6 +69,24 @@ test("logout revokes only the session attached to the current request", async ()
         sessionService.revokeCurrentSession = original;
     }
     assert.deepEqual(revoked, ["current-browser-session"]);
+});
+
+test("logout clears the session cookie before sending the response", async () => {
+    const originalRevoke = sessionService.revokeCurrentSession;
+    const responseEvents = [];
+    sessionService.revokeCurrentSession = async () => true;
+    const res = {
+        clearCookie(name, options) { responseEvents.push(["clear", name, options]); return this; },
+        status(code) { responseEvents.push(["status", code]); return this; },
+        send() { responseEvents.push(["send"]); return this; }
+    };
+    try {
+        await controllers.logoutController({ auth: { sessionId: "current-browser-session" } }, res);
+    } finally {
+        sessionService.revokeCurrentSession = originalRevoke;
+    }
+    assert.equal(responseEvents[0][0], "clear");
+    assert.equal(responseEvents.at(-1)[0], "send");
 });
 
 test("login calls Supabase Auth, persists an HRMS session, and sends only the cookie and safe profile", async () => {
