@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import {
     changePassword, exchangeRecoveryTokens, getSafeSessionStatus, loginUser, logoutUser,
-    registerUser, requestPasswordReset, resetPassword, rotateSessionCsrf
+    RecoveryExchangeError, registerUser, requestPasswordReset, resetPassword, rotateSessionCsrf
 } from "../services/auth.service.js";
 import { SESSION_COOKIE_NAME, sessionCookieOptions } from "../config/session-cookie.js";
 
@@ -49,11 +49,16 @@ export const loginController = async (req: Request, res: Response) => {
 
 export const recoveryExchangeController = async (req: Request, res: Response) => {
     try {
-        const issued = await exchangeRecoveryTokens({ access_token: req.body.access_token, refresh_token: req.body.refresh_token });
+        const body = req.body ?? {};
+        const issued = await exchangeRecoveryTokens({ access_token: body.access_token, refresh_token: body.refresh_token });
         const result = { user: issued.user, profile: issued.profile, session: issued };
         setSessionCookie(res, result);
         res.json({ ...safeAuthResponse(result), session: { purpose: "recovery", scope: "password_reset", idle_expires_at: issued.session.idleExpiresAt } });
-    } catch {
+    } catch (error) {
+        const failure = error instanceof RecoveryExchangeError
+            ? { stage: error.stage, detail: error.detail }
+            : { stage: "unknown", errorName: error instanceof Error ? error.name : typeof error };
+        console.error("[recovery-exchange] failed", failure);
         res.status(401).json({ message: "Recovery link is invalid or expired" });
     }
 };
