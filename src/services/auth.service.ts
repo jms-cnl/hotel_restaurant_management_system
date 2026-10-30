@@ -107,9 +107,24 @@ const readJwtClaims = (token: string) => {
     try {
         const payload = token.split(".")[1];
         return payload ? JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
-            exp?: number; amr?: Array<string | { method?: string }>;
+            exp?: number; amr?: Array<string | { method?: string; timestamp?: number }>;
         } : {};
     } catch { return {}; }
+};
+
+export const isAcceptableRecoveryAmr = (amr: unknown, now = Date.now()) => {
+    if (!Array.isArray(amr)) return false;
+    const oldestAllowed = now - 10 * 60_000;
+    const newestAllowed = now + 60_000;
+    return amr.some((entry) => {
+        if (typeof entry === "string") return entry === "recovery";
+        if (!entry || typeof entry !== "object") return false;
+        const method = (entry as { method?: unknown }).method;
+        const timestamp = (entry as { timestamp?: unknown }).timestamp;
+        if ((method !== "recovery" && method !== "otp") || typeof timestamp !== "number" || !Number.isFinite(timestamp)) return false;
+        const timestampMs = timestamp * 1000;
+        return timestampMs >= oldestAllowed && timestampMs <= newestAllowed;
+    });
 };
 
 const supabaseDiagnostic = (error: unknown) => {
@@ -137,11 +152,12 @@ export const exchangeRecoveryTokens = async (tokens: { access_token: string; ref
         throw new RecoveryExchangeError("missing_fields", "access_token and refresh_token required");
     }
     const claims = readJwtClaims(tokens.access_token);
-    const amrMethods = (claims.amr ?? []).map((entry) => typeof entry === "string"
+    const amrEntries = Array.isArray(claims.amr) ? claims.amr : [];
+    const amrMethods = amrEntries.map((entry) => typeof entry === "string"
         ? entry
         : entry && typeof entry === "object" && typeof entry.method === "string" ? entry.method : null)
         .filter((method): method is string => typeof method === "string");
-    if (!amrMethods.includes("recovery")) throw new RecoveryExchangeError("amr_check", amrMethods.length ? amrMethods : "none");
+    if (!isAcceptableRecoveryAmr(claims.amr)) throw new RecoveryExchangeError("amr_check", amrMethods.length ? amrMethods : "none");
 
     let data: { user: { id: string; email?: string } | null };
     let error: unknown;
