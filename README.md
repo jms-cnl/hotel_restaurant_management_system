@@ -42,3 +42,7 @@ A web-based system for managing hotel and restaurant reservations, tracking rese
 - [ ] Reports and Analytics
 - [ ] Testing
 - [ ] Deployment
+
+## Authentication and session operations
+
+The app uses Supabase Auth with Express-managed opaque cookie sessions. See [the authentication and session operations guide](docs/authentication-and-sessions.md) for lifecycle, security boundaries, required environment variables, expiration, refresh handling, and operational limitations.

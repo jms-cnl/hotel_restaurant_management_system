@@ -15,7 +15,8 @@ export const runWithRequest = (req: Request, callback: () => void) => {
 export const supabase = new Proxy(baseSupabase, {
     get(target, property, receiver) {
         const req = requestStorage.getStore();
-        const client = req?.headers.authorization ? getRequestSupabase(req) : target;
+        const token = req?.auth?.accessToken ?? (req ? getBearerToken(req) : null);
+        const client = token ? getRequestSupabase(req!) : target;
         const value = Reflect.get(client, property, receiver);
 
         return typeof value === "function" ? value.bind(client) : value;
@@ -32,8 +33,8 @@ export const getBearerToken = (req: Request) => {
     return header.slice("Bearer ".length);
 };
 
-export const getRequestSupabase = (req: Request) => {
-    const token = getBearerToken(req);
+export const getRequestSupabase = (req: Request, accessToken?: string) => {
+    const token = accessToken ?? req.auth?.accessToken ?? getBearerToken(req);
 
     if (!token) {
         return baseSupabase;
@@ -47,3 +48,14 @@ export const getRequestSupabase = (req: Request) => {
         }
     });
 };
+
+/** A fresh, non-persistent Auth client for login, registration, and recovery exchange. */
+export const createSupabaseAuthClient = () => createClient(supabaseUrl, supabaseKey, {
+    auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false }
+});
+
+/** User-scoped client for verified Auth tokens; never uses the session-store credential. */
+export const createUserScopedSupabase = (accessToken: string) => createClient(supabaseUrl, supabaseKey, {
+    auth: { autoRefreshToken: false, detectSessionInUrl: false, persistSession: false },
+    global: { headers: { Authorization: `Bearer ${accessToken}` } }
+});
