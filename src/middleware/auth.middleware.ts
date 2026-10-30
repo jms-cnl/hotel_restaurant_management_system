@@ -56,6 +56,14 @@ const defaultAuthenticationDependencies: AuthenticationDependencies = {
 };
 
 type SessionCookieResult = { present: boolean; invalid: boolean; value?: string };
+const sessionRevocationPaths = new Set(["/api/auth/logout", "/api/auth/reset-password"]);
+
+const isSessionRevocationRequest = (req: Request) => {
+    if (req.method.toUpperCase() !== "POST") return false;
+    const url = req.originalUrl || `${req.baseUrl}${req.path}`;
+    const path = (url.split("?", 1)[0] ?? "").replace(/\/+$/, "") || "/";
+    return sessionRevocationPaths.has(path);
+};
 
 export const readSessionCookie = (req: Request): SessionCookieResult => {
     const header = req.headers.cookie;
@@ -199,7 +207,7 @@ export const createAuthenticationMiddleware = (
                 const afterCsrf = (error?: unknown) => {
                     if (error) { next(error); return; }
                     const changesState = ["POST", "PUT", "PATCH", "DELETE"].includes(req.method.toUpperCase());
-                    if (!resolved || !changesState || authMethod !== "session_cookie") { next(); return; }
+                    if (!resolved || !changesState || authMethod !== "session_cookie" || isSessionRevocationRequest(req)) { next(); return; }
                     void dependencies.recordMeaningfulActivity(resolved.session.sessionId, role.role_name!, now)
                         .then((updated) => {
                             if (!updated) { res.status(401).json({ message: "Session expired" }); return; }
