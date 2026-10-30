@@ -5,6 +5,13 @@ import { sessionService } from "./session.service.js";
 import { assertPasswordPolicy } from "./password-policy.js";
 
 type SafeProfile = { user_id: string; role_id: number; role_name: string };
+export type RecoveryExchangeStage = "missing_fields" | "amr_check" | "get_user" | "profile_lookup" | "expiry" | "session_create";
+export class RecoveryExchangeError extends Error {
+    constructor(readonly stage: RecoveryExchangeStage, readonly detail: unknown = undefined) {
+        super("Recovery link is invalid or expired");
+        this.name = "RecoveryExchangeError";
+    }
+}
 export type IssuedAuthSession = {
     cookieSecret: string;
     csrfToken: string;
@@ -14,12 +21,20 @@ export type IssuedAuthSession = {
 };
 export type AuthResult = { user: { id: string; email: string | undefined }; profile?: SafeProfile; session?: IssuedAuthSession };
 
-const currentProfile = async (accessToken: string, userId: string): Promise<SafeProfile> => {
-    const { data, error } = await createUserScopedSupabase(accessToken)
-        .from("user").select("user_id, role_id, role(role_name)").eq("user_id", userId).single();
+const currentProfile = async (accessToken: string, userId: string, onError?: (error: unknown) => void): Promise<SafeProfile> => {
+    let data: unknown;
+    let error: unknown;
+    try {
+        ({ data, error } = await createUserScopedSupabase(accessToken)
+            .from("user").select("user_id, role_id, role(role_name)").eq("user_id", userId).single());
+    } catch (cause) {
+        onError?.(cause);
+        throw cause;
+    }
     const row = data as { user_id?: string; role_id?: number; role?: { role_name?: string } | Array<{ role_name?: string }> } | null;
     const role = Array.isArray(row?.role) ? row.role[0] : row?.role;
     if (error || !row?.user_id || typeof row.role_id !== "number" || !role?.role_name) {
+        onError?.(error);
         throw new Error("Authenticated user profile not found");
     }
     return { user_id: row.user_id, role_id: row.role_id, role_name: role.role_name };
@@ -37,14 +52,21 @@ const expiryFromAuthSession = (session: { expires_at?: number; expires_in?: numb
 
 const issueSession = async (authSession: {
     access_token: string; refresh_token: string; expires_at?: number; expires_in?: number;
-}, user: { id: string; email?: string }, purpose: "app" | "recovery"): Promise<IssuedAuthSession> => {
-    const profile = await currentProfile(authSession.access_token, user.id);
+}, user: { id: string; email?: string }, purpose: "app" | "recovery", recoveryDiagnostics?: {
+    setStage: (stage: "profile_lookup" | "expiry" | "session_create") => void;
+    onProfileError: (error: unknown) => void;
+}): Promise<IssuedAuthSession> => {
+    recoveryDiagnostics?.setStage("profile_lookup");
+    const profile = await currentProfile(authSession.access_token, user.id, recoveryDiagnostics?.onProfileError);
+    recoveryDiagnostics?.setStage("expiry");
+    const accessTokenExpiresAt = expiryFromAuthSession(authSession, authSession.access_token);
     const input = {
         userId: user.id,
         roleName: profile.role_name,
         credentials: { accessToken: authSession.access_token, refreshToken: authSession.refresh_token },
-        accessTokenExpiresAt: expiryFromAuthSession(authSession, authSession.access_token)
+        accessTokenExpiresAt
     };
+    recoveryDiagnostics?.setStage("session_create");
     const issued = purpose === "app"
         ? await sessionService.createApplicationSession(input)
         : await sessionService.createRecoverySession(input);
@@ -81,11 +103,6 @@ export const loginUser = async (payload: { email: string; password: string }): P
     return { user: session.user, profile: session.profile, session };
 };
 
-const isRecoveryToken = (token: string) => {
-    const claims = readJwtClaims(token);
-    return claims.amr?.some((entry) => typeof entry === "string" ? entry === "recovery" : entry.method === "recovery") ?? false;
-};
-
 const readJwtClaims = (token: string) => {
     try {
         const payload = token.split(".")[1];
@@ -95,14 +112,65 @@ const readJwtClaims = (token: string) => {
     } catch { return {}; }
 };
 
+const supabaseDiagnostic = (error: unknown) => {
+    if (!error || typeof error !== "object") return { message: "Supabase request failed" };
+    const value = error as { code?: unknown; status?: unknown; message?: unknown };
+    return {
+        ...(typeof value.code === "string" ? { code: value.code } : {}),
+        ...(typeof value.status === "number" ? { status: value.status } : {}),
+        ...(typeof value.message === "string" ? { message: value.message } : {})
+    };
+};
+
+const sessionCreateDiagnostic = (error: unknown) => {
+    if (!(error instanceof Error) || error.name !== "SessionStoreError") return "session_creation_failed";
+    const cause = error.cause;
+    const code = cause && typeof cause === "object" && "code" in cause && typeof cause.code === "string"
+        ? cause.code
+        : undefined;
+    return { operation: "operation" in error && typeof error.operation === "string" ? error.operation : "unknown", ...(code ? { code } : {}) };
+};
+
 export const exchangeRecoveryTokens = async (tokens: { access_token: string; refresh_token: string }): Promise<IssuedAuthSession> => {
-    if (!tokens.access_token || !tokens.refresh_token || !isRecoveryToken(tokens.access_token)) {
-        throw new Error("Recovery link is invalid or expired");
+    if (typeof tokens.access_token !== "string" || !tokens.access_token
+        || typeof tokens.refresh_token !== "string" || !tokens.refresh_token) {
+        throw new RecoveryExchangeError("missing_fields", "access_token and refresh_token required");
     }
-    const client = createUserScopedSupabase(tokens.access_token);
-    const { data, error } = await client.auth.getUser(tokens.access_token);
-    if (error || !data.user) throw new Error("Recovery link is invalid or expired");
-    return issueSession({ access_token: tokens.access_token, refresh_token: tokens.refresh_token }, data.user, "recovery");
+    const claims = readJwtClaims(tokens.access_token);
+    const amrMethods = (claims.amr ?? []).map((entry) => typeof entry === "string"
+        ? entry
+        : entry && typeof entry === "object" && typeof entry.method === "string" ? entry.method : null)
+        .filter((method): method is string => typeof method === "string");
+    if (!amrMethods.includes("recovery")) throw new RecoveryExchangeError("amr_check", amrMethods.length ? amrMethods : "none");
+
+    let data: { user: { id: string; email?: string } | null };
+    let error: unknown;
+    try {
+        ({ data, error } = await createUserScopedSupabase(tokens.access_token).auth.getUser(tokens.access_token));
+    } catch (cause) {
+        throw new RecoveryExchangeError("get_user", supabaseDiagnostic(cause));
+    }
+    if (error || !data.user) {
+        throw new RecoveryExchangeError("get_user", error ? supabaseDiagnostic(error) : "user_missing");
+    }
+
+    let stage: "profile_lookup" | "expiry" | "session_create" = "profile_lookup";
+    let profileError: unknown;
+    try {
+        return await issueSession({ access_token: tokens.access_token, refresh_token: tokens.refresh_token }, data.user, "recovery", {
+            setStage: (nextStage) => { stage = nextStage; },
+            onProfileError: (profileLookupError) => { profileError = profileLookupError; }
+        });
+    } catch (cause) {
+        if (cause instanceof RecoveryExchangeError) throw cause;
+        if (stage === "profile_lookup") {
+            throw new RecoveryExchangeError(stage, profileError ? supabaseDiagnostic(profileError) : "profile_missing");
+        }
+        if (stage === "expiry") {
+            throw new RecoveryExchangeError(stage, cause instanceof Error ? cause.message : "invalid_expiry");
+        }
+        throw new RecoveryExchangeError(stage, sessionCreateDiagnostic(cause));
+    }
 };
 
 export const requestPasswordReset = async (email: string) => {
