@@ -13,10 +13,12 @@ import roomRouter from "./routes/room.routes.js";
 import tableRouter from "./routes/table.routes.js";
 import userRouter from "./routes/user.routes.js";
 import { createCorsMiddleware, parseAllowedOrigins } from "./middleware/cors.middleware.js";
+import { noStoreApiResponses } from "./middleware/api-cache.middleware.js";
 
 
 const app = express();
 
+app.use("/api", noStoreApiResponses);
 app.use(createCorsMiddleware(parseAllowedOrigins()));
 
 app.use(express.json());
