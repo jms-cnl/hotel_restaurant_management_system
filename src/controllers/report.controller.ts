@@ -12,7 +12,7 @@ const handleReportError = (res: Response, error: unknown, message: string) => {
 
 export const getReservationReportController = async (req: Request, res: Response) => {
     try {
-        const report = await getReservationReport(parseReportFilters(req.query as Record<string, unknown>));
+        const report = await getReservationReport(parseReportFilters(req.query as Record<string, unknown>), req);
 
         res.json(report);
     } catch (error) {
@@ -42,7 +42,7 @@ export const getOccupancyReportController = async (req: Request, res: Response) 
 
 export const getTableReportController = async (req: Request, res: Response) => {
     try {
-        res.json(await getTableReport(parseReportFilters(req.query as Record<string, unknown>)));
+        res.json(await getTableReport(parseReportFilters(req.query as Record<string, unknown>), req));
     } catch (error) {
         handleReportError(res, error, "Failed to retrieve table report");
     }

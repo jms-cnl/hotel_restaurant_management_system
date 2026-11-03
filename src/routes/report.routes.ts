@@ -9,10 +9,9 @@ import { authenticate, requireRole } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
-router.use(authenticate, requireRole("Admin", "Staff"));
-router.get("/reservations", getReservationReportController);
-router.get("/revenue", getRevenueReportController);
-router.get("/occupancy", getOccupancyReportController);
-router.get("/tables", getTableReportController);
+router.get("/reservations", authenticate, requireRole("Admin", "Staff"), getReservationReportController);
+router.get("/revenue", authenticate, requireRole("Admin"), getRevenueReportController);
+router.get("/occupancy", authenticate, requireRole("Admin", "Staff"), getOccupancyReportController);
+router.get("/tables", authenticate, requireRole("Admin", "Staff"), getTableReportController);
 
 export default router;
