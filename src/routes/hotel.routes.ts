@@ -13,8 +13,8 @@ const router = Router();
 router.use(authenticate);
 router.get("/", getHotelsController);
 router.get("/:id", getHotelByIdController);
-router.post("/", requireRole("Admin", "Staff"), createHotelController);
-router.put("/:id", requireRole("Admin", "Staff"), updateHotelController);
-router.delete("/:id", requireRole("Admin", "Staff"), deleteHotelController);
+router.post("/", requireRole("Admin"), createHotelController);
+router.put("/:id", requireRole("Admin"), updateHotelController);
+router.delete("/:id", requireRole("Admin"), deleteHotelController);
 
 export default router;
