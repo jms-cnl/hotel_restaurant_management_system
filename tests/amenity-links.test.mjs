@@ -83,8 +83,9 @@ test("nested amenity GET routes precede /:id and have no additional role guard",
         const nestedIndex = router.stack.findIndex((layer) => layer.route?.path === nestedPath && layer.route.methods.get);
         const byIdIndex = router.stack.findIndex((layer) => layer.route?.path === "/:id" && layer.route.methods.get);
         assert.ok(nestedIndex >= 0 && nestedIndex < byIdIndex);
-        assert.equal(router.stack[nestedIndex].route.stack.length, 1);
-        assert.equal(router.stack[nestedIndex].route.stack[0].handle, getHandler);
+        assert.equal(router.stack[nestedIndex].route.stack.length, 2);
+        assert.equal(router.stack[nestedIndex].route.stack[0].handle, authMiddleware.optionalAuthenticate);
+        assert.equal(router.stack[nestedIndex].route.stack[1].handle, getHandler);
     }
 });
 
@@ -207,7 +208,7 @@ test("unassigned Staff cannot write restaurant links; Customer is forbidden from
         assert.ok(route);
         const res = { statusCode: 200, body: undefined, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
         let nextCalled = false;
-        route.stack[0].handle(request({}, "Customer"), res, () => { nextCalled = true; });
+        route.stack[1].handle(request({}, "Customer"), res, () => { nextCalled = true; });
         assert.equal(res.statusCode, 403);
         assert.deepEqual(res.body, { message: "Insufficient permissions" });
         assert.equal(nextCalled, false);
@@ -239,8 +240,10 @@ test("missing CSRF returns 403 for amenity creation and a room amenity link writ
         runWithRequest: (_req, callback) => callback(),
         now: () => new Date(),
     });
-    assert.equal(amenitiesRouter.default.stack[0].handle, authMiddleware.authenticate);
-    assert.equal(roomRouter.default.stack[0].handle, authMiddleware.authenticate);
+    const amenityPost = amenitiesRouter.default.stack.find((layer) => layer.route?.path === "/" && layer.route.methods.post)?.route;
+    const roomPost = roomRouter.default.stack.find((layer) => layer.route?.path === "/:roomId/amenities" && layer.route.methods.post)?.route;
+    assert.equal(amenityPost.stack[0].handle, authMiddleware.authenticate);
+    assert.equal(roomPost.stack[0].handle, authMiddleware.authenticate);
     for (const path of ["/api/amenities", "/api/rooms/3/amenities"]) {
         const req = {
             method: "POST", originalUrl: path, path, baseUrl: "", headers: { cookie: `${authConfig.SESSION_COOKIE_NAME}=opaque` },

@@ -226,6 +226,14 @@ export const createAuthenticationMiddleware = (
 };
 
 export const authenticate = createAuthenticationMiddleware();
+export const optionalAuthenticate = (req: Request, res: Response, next: NextFunction) => {
+    const cookie = readSessionCookie(req);
+    const bearerToken = getBearerToken(req);
+    if (cookie.present || cookie.invalid || bearerToken !== null) {
+        return authenticate(req, res, next);
+    }
+    runWithRequest(req, next);
+};
 export const authenticateRecovery = createAuthenticationMiddleware({ allowRecovery: true });
 export const authenticateBootstrap = createAuthenticationMiddleware({ requireCsrf: false });
 export const authenticateRecoveryBootstrap = createAuthenticationMiddleware({ allowRecovery: true, requireCsrf: false });
