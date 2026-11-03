@@ -25,8 +25,7 @@ export const getCombinedBookingsController = async (req: Request, res: Response)
         console.error(error);
 
         res.status(statusForError(error)).json({
-            message: "Failed to retrieve combined bookings",
-            error: error
+            message: "Failed to retrieve combined bookings"
         });
     }
 };
@@ -40,8 +39,7 @@ export const getCombinedBookingByIdController = async (req: Request, res: Respon
         console.error(error);
 
         res.status(statusForError(error)).json({
-            message: "Failed to retrieve combined booking",
-            error: error
+            message: "Failed to retrieve combined booking"
         });
     }
 };
@@ -55,8 +53,7 @@ export const getCombinedBookingReservationsController = async (req: Request, res
         console.error(error);
 
         res.status(statusForError(error)).json({
-            message: "Failed to retrieve combined booking reservations",
-            error: error
+            message: "Failed to retrieve combined booking reservations"
         });
     }
 };
@@ -104,8 +101,7 @@ export const updateCombinedBookingController = async (req: Request, res: Respons
         console.error(error);
 
         res.status(statusForError(error)).json({
-            message: "Failed to update combined booking",
-            error: error
+            message: "Failed to update combined booking"
         });
     }
 };
@@ -119,8 +115,7 @@ export const deleteCombinedBookingController = async (req: Request, res: Respons
         console.error(error);
 
         res.status(statusForError(error)).json({
-            message: "Failed to delete combined booking",
-            error: error
+            message: "Failed to delete combined booking"
         });
     }
 };
@@ -134,8 +129,7 @@ export const changeCombinedBookingStatusController = async (req: Request, res: R
         console.error(error);
 
         res.status(statusForError(error)).json({
-            message: "Failed to change combined booking status",
-            error: error
+            message: "Failed to change combined booking status"
         });
     }
 };

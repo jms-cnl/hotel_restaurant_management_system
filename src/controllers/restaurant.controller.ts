@@ -19,8 +19,7 @@ export const getRestaurantsController = async (req: Request, res: Response) => {
         console.error(error);
 
         res.status(500).json({
-            message: "Failed to retrieve restaurants",
-            error: error
+            message: "Failed to retrieve restaurants"
         });
     }
 };
@@ -35,8 +34,7 @@ export const getRestaurantByIdController = async (req: Request, res: Response) =
         console.error(error);
 
         res.status(500).json({
-            message: "Failed to retrieve restaurant",
-            error: error
+            message: "Failed to retrieve restaurant"
         });
     }
 };
@@ -91,8 +89,7 @@ export const deleteRestaurantController = async (req: Request, res: Response) =>
         console.error(error);
 
         res.status(500).json({
-            message: "Failed to delete restaurant",
-            error: error
+            message: "Failed to delete restaurant"
         });
     }
 };

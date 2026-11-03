@@ -9,6 +9,7 @@ import {
     getReservationHistory
 } from "../services/reservation.service.js";
 import { ReservationError } from "../services/reservation.service.js";
+import { getAssignedRestaurantIds, RestaurantAccessError } from "../middleware/restaurant-access.middleware.js";
 
 const statusForError = (error: unknown) => error instanceof ReservationError ? error.statusCode : 500;
 
@@ -21,14 +22,22 @@ export const getReservationsController = async (req: Request, res: Response) => 
             user_id: req.query.user_id?.toString()
         });
 
-        res.json(reservations);
+        if (req.auth?.roleName.toLowerCase() !== "staff") {
+            res.json(reservations);
+            return;
+        }
+
+        const assignedRestaurantIds = new Set(await getAssignedRestaurantIds(req));
+        res.json((reservations ?? []).filter((reservation) => {
+            if (String(reservation.reservation_type).toUpperCase() !== "RESTAURANT") return true;
+            const table = Array.isArray(reservation.restaurant_table) ? reservation.restaurant_table[0] : reservation.restaurant_table;
+            return table?.restaurant_id !== undefined && assignedRestaurantIds.has(Number(table.restaurant_id));
+        }));
     } catch (error) {
         console.error(error);
 
-        res.status(statusForError(error)).json({
-            message: "Failed to retrieve reservations",
-            error: error
-        });
+        const status = error instanceof RestaurantAccessError ? error.statusCode : statusForError(error);
+        res.status(status).json({ message: error instanceof RestaurantAccessError ? error.message : "Failed to retrieve reservations" });
     }
 };
 
@@ -41,8 +50,7 @@ export const getReservationByIdController = async (req: Request, res: Response) 
         console.error(error);
 
         res.status(statusForError(error)).json({
-            message: "Failed to retrieve reservation",
-            error: error
+            message: "Failed to retrieve reservation"
         });
     }
 };
@@ -56,8 +64,7 @@ export const createReservationController = async (req: Request, res: Response) =
         console.error(error);
 
         res.status(statusForError(error)).json({
-            message: "Failed to create reservation",
-            error: error
+            message: "Failed to create reservation"
         });
     }
 };
@@ -71,8 +78,7 @@ export const updateReservationController = async (req: Request, res: Response) =
         console.error(error);
 
         res.status(statusForError(error)).json({
-            message: "Failed to update reservation",
-            error: error
+            message: "Failed to update reservation"
         });
     }
 };
@@ -86,8 +92,7 @@ export const deleteReservationController = async (req: Request, res: Response) =
         console.error(error);
 
         res.status(statusForError(error)).json({
-            message: "Failed to cancel reservation",
-            error: error
+            message: "Failed to cancel reservation"
         });
     }
 };
@@ -101,8 +106,7 @@ export const changeReservationStatusController = async (req: Request, res: Respo
         console.error(error);
 
         res.status(statusForError(error)).json({
-            message: "Failed to change reservation status",
-            error: error
+            message: "Failed to change reservation status"
         });
     }
 };
@@ -116,8 +120,7 @@ export const getReservationHistoryController = async (req: Request, res: Respons
         console.error(error);
 
         res.status(statusForError(error)).json({
-            message: "Failed to retrieve reservation history",
-            error: error
+            message: "Failed to retrieve reservation history"
         });
     }
 };

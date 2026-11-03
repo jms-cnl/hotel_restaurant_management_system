@@ -16,8 +16,7 @@ export const getTablesController = async (req: Request, res: Response) => {
         console.error(error);
 
         res.status(500).json({
-            message: "Failed to retrieve tables",
-            error: error
+            message: "Failed to retrieve tables"
         });
     }
 };
@@ -31,8 +30,7 @@ export const getTableByIdController = async (req: Request, res: Response) => {
         console.error(error);
 
         res.status(500).json({
-            message: "Failed to retrieve table",
-            error: error
+            message: "Failed to retrieve table"
         });
     }
 };
@@ -46,8 +44,7 @@ export const createTableController = async (req: Request, res: Response) => {
         console.error(error);
 
         res.status(500).json({
-            message: "Failed to create table",
-            error: error
+            message: "Failed to create table"
         });
     }
 };
@@ -61,8 +58,7 @@ export const updateTableController = async (req: Request, res: Response) => {
         console.error(error);
 
         res.status(500).json({
-            message: "Failed to update table",
-            error: error
+            message: "Failed to update table"
         });
     }
 };
@@ -76,8 +72,7 @@ export const deleteTableController = async (req: Request, res: Response) => {
         console.error(error);
 
         res.status(500).json({
-            message: "Failed to delete table",
-            error: error
+            message: "Failed to delete table"
         });
     }
 };
