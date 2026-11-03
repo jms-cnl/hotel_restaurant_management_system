@@ -4,7 +4,8 @@ import {
     getRestaurantById,
     createRestaurant,
     updateRestaurant,
-    deleteRestaurant
+    deleteRestaurant,
+    RestaurantError
 } from "../services/restaurant.service.js";
 
 export const getRestaurantsController = async (req: Request, res: Response) => {
@@ -48,9 +49,13 @@ export const createRestaurantController = async (req: Request, res: Response) =>
     } catch (error) {
         console.error(error);
 
+        if (error instanceof RestaurantError) {
+            res.status(error.statusCode).json({ message: error.message });
+            return;
+        }
+
         res.status(500).json({
-            message: "Failed to create restaurant",
-            error: error
+            message: "Failed to create restaurant"
         });
     }
 };
@@ -64,9 +69,13 @@ export const updateRestaurantController = async (req: Request, res: Response) =>
     } catch (error) {
         console.error(error);
 
+        if (error instanceof RestaurantError) {
+            res.status(error.statusCode).json({ message: error.message });
+            return;
+        }
+
         res.status(500).json({
-            message: "Failed to update restaurant",
-            error: error
+            message: "Failed to update restaurant"
         });
     }
 };

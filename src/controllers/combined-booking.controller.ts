@@ -69,10 +69,12 @@ export const createCombinedBookingController = async (req: Request, res: Respons
     } catch (error) {
         console.error(error);
 
-        res.status(statusForError(error)).json({
-            message: "Failed to create combined booking",
-            error: error
-        });
+        if (error instanceof ReservationError) {
+            res.status(error.statusCode).json({ message: error.message });
+            return;
+        }
+
+        res.status(500).json({ message: "Failed to create combined booking" });
     }
 };
 
@@ -84,10 +86,12 @@ export const createHotelRestaurantCombinedBookingController = async (req: Reques
     } catch (error) {
         console.error(error);
 
-        res.status(statusForError(error)).json({
-            message: "Failed to create hotel and restaurant combined booking",
-            error: error
-        });
+        if (error instanceof ReservationError) {
+            res.status(error.statusCode).json({ message: error.message });
+            return;
+        }
+
+        res.status(500).json({ message: "Failed to create combined booking" });
     }
 };
 

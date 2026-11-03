@@ -54,6 +54,26 @@ const validateCombinedChildren = async (userId: string, children: unknown) => {
 
     for (const reservation of normalized) await validateReservation(reservation);
 
+    const hotelReservation = normalized.find((reservation) => reservation.reservation_type === "HOTEL");
+    const restaurantReservation = normalized.find((reservation) => reservation.reservation_type === "RESTAURANT");
+    const mismatchMessage = "Room and table must belong to the same hotel";
+    if (!hotelReservation?.room_id || !restaurantReservation?.table_id) throw new ReservationError(mismatchMessage);
+
+    const { data: rooms, error: roomError } = await supabase.from("room").select("hotel_id").eq("room_id", hotelReservation.room_id);
+    if (roomError) throw roomError;
+    const { data: tables, error: tableError } = await supabase.from("restaurant_table").select("restaurant_id").eq("table_id", restaurantReservation.table_id);
+    if (tableError) throw tableError;
+    const restaurantId = tables?.[0]?.restaurant_id;
+    const { data: restaurants, error: restaurantError } = restaurantId
+        ? await supabase.from("restaurant").select("hotel_id").eq("restaurant_id", restaurantId)
+        : { data: null, error: null };
+    if (restaurantError) throw restaurantError;
+    const roomHotelId = rooms?.[0]?.hotel_id;
+    const restaurantHotelId = restaurants?.[0]?.hotel_id;
+    if (roomHotelId === null || roomHotelId === undefined || restaurantHotelId === null || restaurantHotelId === undefined || roomHotelId !== restaurantHotelId) {
+        throw new ReservationError(mismatchMessage);
+    }
+
     for (let index = 0; index < normalized.length; index += 1) {
         for (let otherIndex = index + 1; otherIndex < normalized.length; otherIndex += 1) {
             const left = normalized[index];
