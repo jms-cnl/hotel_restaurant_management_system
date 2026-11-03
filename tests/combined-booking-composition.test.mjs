@@ -48,7 +48,7 @@ const jsonResponse = (body, status = 200) => new Response(JSON.stringify(body), 
     headers: { "Content-Type": "application/json", "Content-Range": "0-0/1" },
 });
 
-const withSuccessfulDatabase = async (action) => {
+const withSuccessfulDatabase = async (action, { roomHotelId = 8, restaurantHotelId = 8 } = {}) => {
     const originalFetch = globalThis.fetch;
     const insertBodies = [];
     let nextReservationId = 100;
@@ -56,7 +56,12 @@ const withSuccessfulDatabase = async (action) => {
         const url = new URL(String(input));
         const table = url.pathname.split("/").at(-1);
         const method = (init.method ?? "GET").toUpperCase();
-        if (method === "GET") return jsonResponse([]);
+        if (method === "GET") {
+            if (table === "room") return jsonResponse([{ hotel_id: roomHotelId }]);
+            if (table === "restaurant_table") return jsonResponse([{ restaurant_id: 9 }]);
+            if (table === "restaurant") return jsonResponse([{ hotel_id: restaurantHotelId }]);
+            return jsonResponse([]);
+        }
 
         const body = init.body ? JSON.parse(String(init.body)) : undefined;
         insertBodies.push({ table, body });
@@ -94,12 +99,30 @@ for (const [label, reservations] of invalidGenericPayloads) {
         try {
             const response = await invoke(createCombinedBookingController, { user_id: "customer-1", reservations });
             assert.equal(response.statusCode, 400);
+            if (label === "one child") {
+                assert.equal(response.body.message, "A combined booking must contain exactly one HOTEL and one RESTAURANT reservation");
+            }
             assert.equal(databaseCalled, false);
         } finally {
             globalThis.fetch = originalFetch;
         }
     });
 }
+
+test("combined booking non-reservation errors return only the generic message", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => jsonResponse({ message: "Database failure", code: "XX" }, 500);
+    const originalError = console.error;
+    console.error = () => undefined;
+    try {
+        const response = await invoke(createCombinedBookingController, { user_id: "customer-1", reservations: [hotel(), restaurant()] });
+        assert.equal(response.statusCode, 500);
+        assert.deepEqual(response.body, { message: "Failed to create combined booking" });
+    } finally {
+        globalThis.fetch = originalFetch;
+        console.error = originalError;
+    }
+});
 
 test("generic combined booking accepts exactly one HOTEL and one RESTAURANT reservation", async () => {
     await withSuccessfulDatabase(async (insertBodies) => {
@@ -113,6 +136,38 @@ test("generic combined booking accepts exactly one HOTEL and one RESTAURANT rese
         assert.deepEqual(response.body.reservations.map((row) => row.reservation_type).sort(), ["HOTEL", "RESTAURANT"]);
         assert.equal(insertBodies.find((entry) => entry.table === "combined_booking")?.table, "combined_booking");
     });
+});
+
+test("combined booking rejects a restaurant without hotel_id before inserting", async () => {
+    await withSuccessfulDatabase(async (insertBodies) => {
+        const response = await invoke(createCombinedBookingController, {
+            user_id: "customer-1", reservations: [hotel(), restaurant()],
+        });
+        assert.equal(response.statusCode, 400);
+        assert.equal(response.body.message, "Room and table must belong to the same hotel");
+        assert.equal(insertBodies.some((entry) => entry.table === "combined_booking"), false);
+    }, { restaurantHotelId: null });
+});
+
+test("combined booking accepts a room and table in the same hotel", async () => {
+    await withSuccessfulDatabase(async (insertBodies) => {
+        const response = await invoke(createCombinedBookingController, {
+            user_id: "customer-1", reservations: [hotel(), restaurant()],
+        });
+        assert.equal(response.statusCode, 201);
+        assert.equal(insertBodies.filter((entry) => entry.table === "combined_booking").length, 1);
+    });
+});
+
+test("combined booking rejects a room and table in different hotels before inserting", async () => {
+    await withSuccessfulDatabase(async (insertBodies) => {
+        const response = await invoke(createCombinedBookingController, {
+            user_id: "customer-1", reservations: [hotel(), restaurant()],
+        });
+        assert.equal(response.statusCode, 400);
+        assert.equal(response.body.message, "Room and table must belong to the same hotel");
+        assert.equal(insertBodies.some((entry) => entry.table === "combined_booking"), false);
+    }, { restaurantHotelId: 12 });
 });
 
 test("hotel-restaurant endpoint succeeds with one reservation of each type", async () => {
