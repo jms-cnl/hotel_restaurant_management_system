@@ -30,10 +30,22 @@ export const getCombinedBookingReservations = async (id: number) => {
     return data;
 };
 
-const validateCombinedChildren = async (userId: string, children: CombinedReservationInput[]) => {
-    if (!userId || children.length === 0) throw new ReservationError("A combined booking requires at least one reservation");
+const validateCombinedChildren = async (userId: string, children: unknown) => {
+    if (!Array.isArray(children) || children.length !== 2) {
+        throw new ReservationError("A combined booking must contain exactly one HOTEL and one RESTAURANT reservation");
+    }
+    const childTypes = children.map((reservation: unknown) =>
+        reservation && typeof reservation === "object" && "reservation_type" in reservation && typeof reservation.reservation_type === "string"
+            ? reservation.reservation_type.toUpperCase()
+            : ""
+    );
+    if (childTypes.filter((type: string) => type === "HOTEL").length !== 1 ||
+        childTypes.filter((type: string) => type === "RESTAURANT").length !== 1) {
+        throw new ReservationError("A combined booking must contain exactly one HOTEL and one RESTAURANT reservation");
+    }
+    if (!userId) throw new ReservationError("user_id is required");
 
-    const normalized = children.map((reservation) => ({
+    const normalized = (children as CombinedReservationInput[]).map((reservation) => ({
         ...reservation,
         user_id: reservation.user_id ?? userId,
         reservation_type: reservation.reservation_type.toUpperCase(),
