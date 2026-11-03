@@ -1,4 +1,6 @@
-import { supabase } from "../config/supabase.js";
+import { getRequestSupabase, supabase } from "../config/supabase.js";
+import type { Request } from "express";
+import { getAssignedRestaurantIds } from "../middleware/restaurant-access.middleware.js";
 
 export const REPORT_STATUSES = ["Pending", "Confirmed", "Rejected", "Cancelled", "Completed"] as const;
 export type ReportFilters = {
@@ -54,16 +56,16 @@ export const parseReportFilters = (query: Record<string, unknown>): ReportFilter
     };
 };
 
-const getRelatedIds = async (filters: ReportFilters) => {
+const getRelatedIds = async (filters: ReportFilters, client: typeof supabase) => {
     let roomIds: number[] | undefined;
     let tableIds: number[] | undefined;
     if (filters.hotelId !== undefined) {
-        const { data, error } = await supabase.from("room").select("room_id").eq("hotel_id", filters.hotelId);
+        const { data, error } = await client.from("room").select("room_id").eq("hotel_id", filters.hotelId);
         if (error) throw error;
         roomIds = (data ?? []).map((room) => room.room_id);
     }
     if (filters.restaurantId !== undefined) {
-        const { data, error } = await supabase.from("restaurant_table").select("table_id").eq("restaurant_id", filters.restaurantId);
+        const { data, error } = await client.from("restaurant_table").select("table_id").eq("restaurant_id", filters.restaurantId);
         if (error) throw error;
         tableIds = (data ?? []).map((table) => table.table_id);
     }
@@ -81,10 +83,33 @@ const overlapsDateFilter = (reservation: Record<string, any>, filters: ReportFil
         (!filters.dateTo || Boolean(reservationDate && reservationDate <= filters.dateTo));
 };
 
-export const getReservationRows = async (filters: ReportFilters = {}) => {
-    const relatedIds = await getRelatedIds(filters);
-    if (relatedIds.roomIds?.length === 0 || relatedIds.tableIds?.length === 0) return [];
-    let query = supabase.from("reservation")
+export const getReservationRows = async (filters: ReportFilters = {}, req?: Request) => {
+    const client = req ? getRequestSupabase(req) : supabase;
+    const isStaff = req?.auth?.roleName.toLowerCase() === "staff";
+    let assignedRestaurantIds: number[] | undefined;
+    let assignedTableIds: number[] | undefined;
+    if (isStaff) {
+        assignedRestaurantIds = await getAssignedRestaurantIds(req!);
+        if (filters.restaurantId !== undefined && !assignedRestaurantIds.includes(filters.restaurantId)) {
+            throw new ReportError("Not assigned to this restaurant", 403);
+        }
+        if (assignedRestaurantIds.length === 0) {
+            assignedTableIds = [];
+        } else {
+            const restaurantIds = filters.restaurantId === undefined ? assignedRestaurantIds : [filters.restaurantId];
+            const { data, error } = await client.from("restaurant_table").select("table_id").in("restaurant_id", restaurantIds);
+            if (error) throw error;
+            assignedTableIds = (data ?? []).map((table) => Number(table.table_id));
+        }
+    }
+    const relatedIds = await getRelatedIds(filters, client);
+    if (isStaff && assignedTableIds && relatedIds.tableIds) {
+        assignedTableIds = assignedTableIds.filter((tableId) => relatedIds.tableIds!.includes(tableId));
+    }
+    if (relatedIds.roomIds?.length === 0) return [];
+    if (relatedIds.tableIds?.length === 0 && filters.type === "RESTAURANT") return [];
+    if (isStaff && assignedTableIds?.length === 0 && filters.type === "RESTAURANT") return [];
+    let query = client.from("reservation")
         .select("*, user(*), room(*, hotel(*)), restaurant_table(*, restaurant(*)), combined_booking(*)")
         .order("created_at", { ascending: false });
     if (filters.status) query = query.eq("status", filters.status);
@@ -92,7 +117,16 @@ export const getReservationRows = async (filters: ReportFilters = {}) => {
     if (filters.roomId !== undefined) query = query.eq("room_id", filters.roomId);
     else if (relatedIds.roomIds) query = query.in("room_id", relatedIds.roomIds);
     if (filters.tableId !== undefined) query = query.eq("table_id", filters.tableId);
-    else if (relatedIds.tableIds) query = query.in("table_id", relatedIds.tableIds);
+    else if (relatedIds.tableIds && !isStaff) query = query.in("table_id", relatedIds.tableIds);
+    if (isStaff) {
+        if (!assignedTableIds?.length) {
+            if (filters.type !== "HOTEL") query = query.eq("reservation_type", "HOTEL");
+        } else if (filters.type === "RESTAURANT") {
+            query = query.in("table_id", assignedTableIds);
+        } else if (!filters.type) {
+            query = query.or(`reservation_type.eq.HOTEL,and(reservation_type.eq.RESTAURANT,table_id.in.(${assignedTableIds.join(",")}))`);
+        }
+    }
     const { data, error } = await query;
     if (error) throw error;
     return (data ?? []).filter((reservation) => overlapsDateFilter(reservation, filters));
@@ -106,13 +140,13 @@ const summarize = (rows: any[]) => ({
     statusBreakdown: Object.fromEntries(REPORT_STATUSES.map((status) => [status, rows.filter((row) => row.status === status).length]))
 });
 
-export const getReservationReport = async (filters: ReportFilters = {}) => {
-    const reservations = await getReservationRows(filters);
+export const getReservationReport = async (filters: ReportFilters = {}, req?: Request) => {
+    const reservations = await getReservationRows(filters, req);
     return { summary: summarize(reservations), reservations };
 };
 
-export const getTableReport = async (filters: ReportFilters = {}) => {
-    const reservations = await getReservationRows({ ...filters, type: "RESTAURANT", hotelId: undefined, roomId: undefined });
+export const getTableReport = async (filters: ReportFilters = {}, req?: Request) => {
+    const reservations = await getReservationRows({ ...filters, type: "RESTAURANT", hotelId: undefined, roomId: undefined }, req);
     return { summary: { totalTableReservations: reservations.length, statusBreakdown: summarize(reservations).statusBreakdown }, reservations };
 };
 
