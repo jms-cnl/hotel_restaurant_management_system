@@ -6,15 +6,14 @@ import {
     updateHotelController,
     deleteHotelController
 } from "../controllers/hotel.controller.js";
-import { authenticate, requireRole } from "../middleware/auth.middleware.js";
+import { authenticate, optionalAuthenticate, requireRole } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
-router.use(authenticate);
-router.get("/", getHotelsController);
-router.get("/:id", getHotelByIdController);
-router.post("/", requireRole("Admin"), createHotelController);
-router.put("/:id", requireRole("Admin"), updateHotelController);
-router.delete("/:id", requireRole("Admin"), deleteHotelController);
+router.get("/", optionalAuthenticate, getHotelsController);
+router.get("/:id", optionalAuthenticate, getHotelByIdController);
+router.post("/", authenticate, requireRole("Admin"), createHotelController);
+router.put("/:id", authenticate, requireRole("Admin"), updateHotelController);
+router.delete("/:id", authenticate, requireRole("Admin"), deleteHotelController);
 
 export default router;

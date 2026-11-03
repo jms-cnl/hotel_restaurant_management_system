@@ -164,11 +164,11 @@ test("Admin bypasses restaurant assignment lookups and Customer behavior is unch
 test("Staff is forbidden from creating or deleting restaurants", async () => {
     for (const [router, path, method] of [[restaurantRouter, "/", "post"], [restaurantRouter, "/:id", "delete"]]) {
         const route = routeFor(router, path, method);
-        const staffResult = await invoke(route.stack[0].handle, request("Staff"));
+        const staffResult = await invoke(route.stack[1].handle, request("Staff"));
         assert.equal(staffResult.statusCode, 403);
         assert.equal(staffResult.body.message, "Insufficient permissions");
         assert.equal(staffResult.nextCalled, false);
-        const adminResult = await invoke(route.stack[0].handle, request("Admin"));
+        const adminResult = await invoke(route.stack[1].handle, request("Admin"));
         assert.equal(adminResult.nextCalled, true);
     }
 });

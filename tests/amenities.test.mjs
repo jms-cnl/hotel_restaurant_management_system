@@ -4,9 +4,10 @@ import test from "node:test";
 process.env.SUPABASE_URL = "https://example.supabase.co";
 process.env.SUPABASE_KEY = "sb_publishable_test-business-data";
 
-const [{ default: amenitiesRouter }, controller] = await Promise.all([
+const [{ default: amenitiesRouter }, controller, authMiddleware] = await Promise.all([
     import("../dist/routes/amenity.routes.js"),
     import("../dist/controllers/amenity.controller.js"),
+    import("../dist/middleware/auth.middleware.js"),
 ]);
 
 const ADMIN_ID = "00000000-0000-4000-8000-000000000002";
@@ -200,11 +201,13 @@ test("DELETE validates id and returns 404 when amenity is missing", async () => 
 });
 
 test("amenity routes authenticate all users and restrict writes to Admin", () => {
-    assert.equal(amenitiesRouter.stack[0].name, "<anonymous>");
+    const getRoute = amenitiesRouter.stack.find((layer) => layer.route?.methods.get)?.route;
+    assert.equal(getRoute.stack[0].handle, authMiddleware.optionalAuthenticate);
     for (const method of ["post", "put", "delete"]) {
         const route = amenitiesRouter.stack.find((layer) => layer.route?.methods[method])?.route;
         assert.ok(route);
-        const guard = route.stack[0].handle;
+        assert.equal(route.stack[0].handle, authMiddleware.authenticate);
+        const guard = route.stack[1].handle;
         for (const roleName of ["Staff", "Customer"]) {
             const res = {
                 statusCode: 200, body: undefined,
@@ -223,7 +226,7 @@ test("amenity routes authenticate all users and restrict writes to Admin", () =>
             json(body) { this.body = body; return this; },
         };
         let adminNextCalled = false;
-        route.stack[0].handle(request({}, {}, {}, "Admin"), adminResponse, () => { adminNextCalled = true; });
+        route.stack[1].handle(request({}, {}, {}, "Admin"), adminResponse, () => { adminNextCalled = true; });
         assert.equal(adminNextCalled, true);
     }
 });

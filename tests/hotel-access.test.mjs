@@ -4,9 +4,10 @@ import test from "node:test";
 process.env.SUPABASE_URL = "https://example.supabase.co";
 process.env.SUPABASE_KEY = "sb_publishable_test-business-data";
 
-const [{ default: hotelRouter }, { default: mediaRouter }] = await Promise.all([
+const [{ default: hotelRouter }, { default: mediaRouter }, authMiddleware] = await Promise.all([
     import("../dist/routes/hotel.routes.js"),
     import("../dist/routes/media.routes.js"),
+    import("../dist/middleware/auth.middleware.js"),
 ]);
 
 const findRoute = (router, path, method) => router.stack.find(
@@ -35,7 +36,7 @@ for (const [path, method] of [["/", "post"], ["/:id", "put"], ["/:id", "delete"]
     test(`Staff is forbidden from hotel ${method.toUpperCase()} ${path}`, async () => {
         const route = findRoute(hotelRouter, path, method);
         assert.ok(route);
-        const result = await invoke(route.stack[0].handle, request("Staff"));
+        const result = await invoke(route.stack[1].handle, request("Staff"));
         assert.equal(result.statusCode, 403);
         assert.equal(result.nextCalled, false);
     });
@@ -43,17 +44,18 @@ for (const [path, method] of [["/", "post"], ["/:id", "put"], ["/:id", "delete"]
     test(`Admin is allowed to hotel ${method.toUpperCase()} ${path}`, async () => {
         const route = findRoute(hotelRouter, path, method);
         assert.ok(route);
-        const result = await invoke(route.stack[0].handle, request("Admin"));
+        const result = await invoke(route.stack[1].handle, request("Admin"));
         assert.equal(result.statusCode, 200);
         assert.equal(result.nextCalled, true);
     });
 }
 
-test("hotel GET routes remain unguarded at the route level", () => {
+test("hotel GET routes use optional auth without a role guard", () => {
     for (const path of ["/", "/:id"]) {
         const route = findRoute(hotelRouter, path, "get");
         assert.ok(route);
-        assert.equal(route.stack.length, 1);
+        assert.equal(route.stack.length, 2);
+        assert.equal(route.stack[0].handle, authMiddleware.optionalAuthenticate);
     }
 });
 

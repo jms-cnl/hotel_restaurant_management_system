@@ -5,14 +5,13 @@ import {
     getAmenitiesController,
     updateAmenityController
 } from "../controllers/amenity.controller.js";
-import { authenticate, requireRole } from "../middleware/auth.middleware.js";
+import { authenticate, optionalAuthenticate, requireRole } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
-router.use(authenticate);
-router.get("/", getAmenitiesController);
-router.post("/", requireRole("Admin"), createAmenityController);
-router.put("/:id", requireRole("Admin"), updateAmenityController);
-router.delete("/:id", requireRole("Admin"), deleteAmenityController);
+router.get("/", optionalAuthenticate, getAmenitiesController);
+router.post("/", authenticate, requireRole("Admin"), createAmenityController);
+router.put("/:id", authenticate, requireRole("Admin"), updateAmenityController);
+router.delete("/:id", authenticate, requireRole("Admin"), deleteAmenityController);
 
 export default router;

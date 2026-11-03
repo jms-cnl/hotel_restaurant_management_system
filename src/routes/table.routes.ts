@@ -9,7 +9,7 @@ import {
     
     
 } from "../controllers/table.controller.js";
-import { authenticate, requireRole } from "../middleware/auth.middleware.js";
+import { authenticate, optionalAuthenticate, requireRole } from "../middleware/auth.middleware.js";
 import {
     requireRestaurantAccess,
     restaurantIdFromTableBody,
@@ -19,11 +19,10 @@ import {
 
 const router = Router();
 
-router.use(authenticate);
-router.get("/", getTablesController);
-router.get("/:id", getTableByIdController);
-router.post("/", requireRole("Admin", "Staff"), requireRestaurantAccess(restaurantIdFromTableBody), createTableController);
-router.put("/:id", requireRole("Admin", "Staff"), requireRestaurantAccess(restaurantIdsFromTableUpdate), updateTableController);
-router.delete("/:id", requireRole("Admin", "Staff"), requireRestaurantAccess(restaurantIdsFromTableRecord), deleteTableController);
+router.get("/", optionalAuthenticate, getTablesController);
+router.get("/:id", optionalAuthenticate, getTableByIdController);
+router.post("/", authenticate, requireRole("Admin", "Staff"), requireRestaurantAccess(restaurantIdFromTableBody), createTableController);
+router.put("/:id", authenticate, requireRole("Admin", "Staff"), requireRestaurantAccess(restaurantIdsFromTableUpdate), updateTableController);
+router.delete("/:id", authenticate, requireRole("Admin", "Staff"), requireRestaurantAccess(restaurantIdsFromTableRecord), deleteTableController);
 
 export default router;
