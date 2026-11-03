@@ -4,6 +4,11 @@ import multer from "multer";
 import { authenticate, requireRole } from "../middleware/auth.middleware.js";
 import { getRequestSupabase } from "../config/supabase.js";
 import {
+    requireRestaurantAccess,
+    restaurantIdFromMediaEntityParam,
+    restaurantIdsFromMediaRecord
+} from "../middleware/restaurant-access.middleware.js";
+import {
     deleteMediaController,
     getMediaController,
     replaceMediaController,
@@ -63,10 +68,10 @@ const requireAdminForHotelMedia = async (req: Request, res: Response, next: Next
 
 router.use(authenticate);
 router.get("/:entityType/:entityId", getMediaController);
-router.post("/:entityType/:entityId", requireMediaWriteRole, parseUpload, uploadMediaController);
-router.put("/:id/file", requireRole("Admin", "Staff"), requireAdminForHotelMedia, parseUpload, replaceMediaController);
-router.patch("/:id/primary", requireRole("Admin", "Staff"), requireAdminForHotelMedia, setPrimaryMediaController);
-router.patch("/:id/order", requireRole("Admin", "Staff"), requireAdminForHotelMedia, updateMediaOrderController);
-router.delete("/:id", requireRole("Admin", "Staff"), requireAdminForHotelMedia, deleteMediaController);
+router.post("/:entityType/:entityId", requireMediaWriteRole, requireRestaurantAccess(restaurantIdFromMediaEntityParam), parseUpload, uploadMediaController);
+router.put("/:id/file", requireRole("Admin", "Staff"), requireAdminForHotelMedia, requireRestaurantAccess(restaurantIdsFromMediaRecord), parseUpload, replaceMediaController);
+router.patch("/:id/primary", requireRole("Admin", "Staff"), requireAdminForHotelMedia, requireRestaurantAccess(restaurantIdsFromMediaRecord), setPrimaryMediaController);
+router.patch("/:id/order", requireRole("Admin", "Staff"), requireAdminForHotelMedia, requireRestaurantAccess(restaurantIdsFromMediaRecord), updateMediaOrderController);
+router.delete("/:id", requireRole("Admin", "Staff"), requireAdminForHotelMedia, requireRestaurantAccess(restaurantIdsFromMediaRecord), deleteMediaController);
 
 export default router;
