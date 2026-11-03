@@ -95,45 +95,38 @@ export const createCombinedBooking = async (payload: {
     reservations?: CombinedReservationInput[];
 }, changedBy = payload.user_id) => {
     if (payload.status && payload.status !== "Pending") throw new ReservationError("New combined bookings must start with Pending status");
-    const reservations = await validateCombinedChildren(payload.user_id, payload.reservations ?? []);
-
-    const { data: combinedBooking, error: combinedBookingError } = await supabase.from("combined_booking").insert({
-        user_id: payload.user_id,
-        status: "Pending"
-    }).select().single();
-    if (combinedBookingError) throw combinedBookingError;
-
-    const childRows = reservations.map((reservation) => ({
-        ...reservation,
-        combined_booking_id: combinedBooking.combined_booking_id
+    const validatedReservations = await validateCombinedChildren(payload.user_id, payload.reservations ?? []);
+    const reservations = validatedReservations.map((reservation) => ({
+        reservation_type: reservation.reservation_type,
+        room_id: reservation.room_id ?? null,
+        table_id: reservation.table_id ?? null,
+        check_in_date: reservation.check_in_date ?? null,
+        check_out_date: reservation.check_out_date ?? null,
+        reservation_date: reservation.reservation_date ?? null,
+        start_time: reservation.start_time ?? null,
+        end_time: reservation.end_time ?? null,
+        special_request: reservation.special_request ?? null
     }));
-    const { data, error } = await supabase.from("reservation").insert(childRows).select();
-
-    if (error || !data) {
-        await supabase.from("combined_booking").delete().eq("combined_booking_id", combinedBooking.combined_booking_id);
-        throw error ?? new Error("Failed to create combined booking reservations");
+    const { data: combinedBooking, error } = await supabase.rpc("create_combined_booking", {
+        p_reservations: reservations
+    });
+    if (error) {
+        if (error.code === "22023") throw new ReservationError(error.message, 400);
+        if (error.code === "42501") throw new ReservationError(error.message, 403);
+        throw error;
     }
-
-    const { error: historyError } = await supabase.from("reservation_status_history").insert(data.map((reservation) => ({
-        reservation_id: reservation.reservation_id,
-        changed_by: changedBy,
-        status: "Pending",
-        remarks: "Reservation created through combined booking"
-    })));
-
-    if (historyError) {
-        await supabase.from("reservation").delete().eq("combined_booking_id", combinedBooking.combined_booking_id);
-        await supabase.from("combined_booking").delete().eq("combined_booking_id", combinedBooking.combined_booking_id);
-        throw historyError;
+    if (!combinedBooking || !Array.isArray(combinedBooking.reservations)) {
+        throw new Error("Combined booking RPC returned an invalid result");
     }
+    const createdReservations = combinedBooking.reservations as Array<{ user_id: string; reservation_id: number }>;
 
-    await Promise.all(data.map((reservation) => createReservationNotification({
+    await Promise.all(createdReservations.map((reservation) => createReservationNotification({
         userId: reservation.user_id,
         reservationId: reservation.reservation_id,
         type: "RESERVATION_CREATED"
     })));
 
-    return { ...combinedBooking, reservations: data };
+    return { ...combinedBooking, reservations: createdReservations };
 };
 
 export const createHotelRestaurantCombinedBooking = async (payload: {
