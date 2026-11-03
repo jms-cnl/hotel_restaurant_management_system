@@ -113,6 +113,9 @@ export const getReservationById = async (id: number) => {
 };
 
 export const createReservation = async (reservation: ReservationInput, changedBy = reservation.user_id) => {
+    if (reservation.combined_booking_id !== undefined && reservation.combined_booking_id !== null) {
+        throw new ReservationError("Reservations cannot be attached directly to a combined booking");
+    }
     const normalized = { ...reservation, reservation_type: reservation.reservation_type.toUpperCase(), status: "Pending" };
     await validateReservation(normalized);
     const { data, error } = await supabase.from("reservation").insert(normalized).select().single();
@@ -135,6 +138,14 @@ export const createReservation = async (reservation: ReservationInput, changedBy
 export const updateReservation = async (id: number, reservation: Partial<ReservationInput>) => {
     const { data: current, error: currentError } = await supabase.from("reservation").select("*").eq("reservation_id", id).single();
     if (currentError || !current) throw currentError ?? new ReservationError("Reservation not found", 404);
+    if (Object.hasOwn(reservation, "combined_booking_id") && reservation.combined_booking_id !== current.combined_booking_id) {
+        throw new ReservationError("Reservations cannot be attached to or moved between combined bookings");
+    }
+    if (current.combined_booking_id !== null && current.combined_booking_id !== undefined &&
+        typeof reservation.reservation_type === "string" &&
+        reservation.reservation_type.toUpperCase() !== String(current.reservation_type).toUpperCase()) {
+        throw new ReservationError("A combined booking reservation cannot change type");
+    }
     if (reservation.status && reservation.status !== current.status) throw new ReservationError("Use the status endpoint to change reservation status");
 
     const merged = { ...current, ...reservation, status: current.status } as ReservationRecord;
