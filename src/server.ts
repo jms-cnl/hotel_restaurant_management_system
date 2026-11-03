@@ -15,6 +15,7 @@ import tableRouter from "./routes/table.routes.js";
 import userRouter from "./routes/user.routes.js";
 import { createCorsMiddleware, parseAllowedOrigins } from "./middleware/cors.middleware.js";
 import { noStoreApiResponses } from "./middleware/api-cache.middleware.js";
+import adminUserRouter from "./routes/admin-user.routes.js";
 
 
 const app = express();
@@ -25,6 +26,7 @@ app.use(createCorsMiddleware(parseAllowedOrigins()));
 app.use(express.json());
 
 app.use("/api/auth", authRouter);
+app.use("/api/admin/users", adminUserRouter);
 app.use("/api/users", userRouter);
 app.use("/api/hotels", hotelRouter);
 app.use("/api/restaurants", restaurantRouter);
