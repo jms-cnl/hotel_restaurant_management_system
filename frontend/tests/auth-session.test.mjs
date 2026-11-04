@@ -56,6 +56,14 @@ test("logout clears the in-memory CSRF token even when its request fails", async
     assert.deepEqual(calls, [["clearCsrf"]]);
 });
 
+test("logout treats CSRF bootstrap 401 as logged out", async () => {
+    const unauthorized = Object.assign(new Error("Invalid or expired session"), { status: 401 });
+    const { client, calls } = makeClient({ async post() { throw unauthorized; } });
+
+    await assert.doesNotReject(client.logout());
+    assert.deepEqual(calls, [["clearCsrf"]]);
+});
+
 test("recovery exchanges URL credentials through the backend and restricts to recovery session", async () => {
     const { client, calls } = makeClient();
     const result = await client.recover({ access_token: "link-access", refresh_token: "link-refresh" });

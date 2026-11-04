@@ -85,6 +85,8 @@ export const readSessionCookie = (req: Request): SessionCookieResult => {
     return { present: true, invalid: false, value: matches[0] };
 };
 
+const clearSessionCookie = (res: Response) => res.clearCookie(SESSION_COOKIE_NAME, sessionCookieOptions());
+
 const hasRecoveryAmr = (token: string): boolean => {
     try {
         const payload = token.split(".")[1];
@@ -101,15 +103,30 @@ const hasRecoveryAmr = (token: string): boolean => {
 };
 
 export const createAuthenticationMiddleware = (
-    options: { allowRecovery?: boolean; requireCsrf?: boolean } = {},
+    options: { allowRecovery?: boolean; requireCsrf?: boolean; invalidCookieBehavior?: "reject" | "anonymous" | "logged-out" } = {},
     overrides: Partial<AuthenticationDependencies> = {}
 ) => {
     const dependencies = { ...defaultAuthenticationDependencies, ...overrides };
+    const invalidCookieBehavior = options.invalidCookieBehavior ?? "reject";
+
+    const handleInvalidCookie = (req: Request, res: Response, next: NextFunction, message: string) => {
+        clearSessionCookie(res);
+        if (invalidCookieBehavior === "anonymous") {
+            delete req.auth;
+            dependencies.runWithRequest(req, next);
+            return;
+        }
+        if (invalidCookieBehavior === "logged-out") {
+            res.status(204).send();
+            return;
+        }
+        res.status(401).json({ message });
+    };
 
     return async (req: Request, res: Response, next: NextFunction) => {
         const cookie = readSessionCookie(req);
         if (cookie.invalid) {
-            res.status(401).json({ message: "Invalid or expired session" });
+            handleInvalidCookie(req, res, next, "Invalid or expired session");
             return;
         }
 
@@ -122,7 +139,7 @@ export const createAuthenticationMiddleware = (
             if (cookie.present) {
                 resolved = await dependencies.resolveSession(cookie.value!, now, { allowRecovery: options.allowRecovery ?? false });
                 if (!resolved) {
-                    res.status(401).json({ message: "Invalid or expired session" });
+                    handleInvalidCookie(req, res, next, "Invalid or expired session");
                     return;
                 }
                 accessToken = resolved.credentials.accessToken;
@@ -139,14 +156,18 @@ export const createAuthenticationMiddleware = (
             const client = dependencies.getRequestSupabase(req, accessToken);
             const { data: authData, error: authError } = await client.auth.getUser(accessToken);
             if (authError || !authData.user) {
-                if (resolved) await dependencies.revokeCurrentSession(resolved.session.sessionId, now);
-                res.status(401).json({ message: "Invalid or expired access token" });
+                if (resolved) {
+                    await dependencies.revokeCurrentSession(resolved.session.sessionId, now);
+                    handleInvalidCookie(req, res, next, "Invalid or expired access token");
+                } else {
+                    res.status(401).json({ message: "Invalid or expired access token" });
+                }
                 return;
             }
 
             if (resolved && resolved.session.userId !== authData.user.id) {
                 await dependencies.revokeCurrentSession(resolved.session.sessionId, now);
-                res.status(401).json({ message: "Session identity mismatch" });
+                handleInvalidCookie(req, res, next, "Session identity mismatch");
                 return;
             }
 
@@ -159,7 +180,8 @@ export const createAuthenticationMiddleware = (
 
             const { profile, error: profileError } = await dependencies.getProfile(client, authData.user.id);
             if (profileError || !profile) {
-                res.status(401).json({ message: "Authenticated user profile not found" });
+                if (resolved) handleInvalidCookie(req, res, next, "Authenticated user profile not found");
+                else res.status(401).json({ message: "Authenticated user profile not found" });
                 return;
             }
 
@@ -180,7 +202,7 @@ export const createAuthenticationMiddleware = (
                 }
                 if (roleIdleExpired) {
                     await dependencies.revokeCurrentSession(resolved.session.sessionId, now);
-                    res.status(401).json({ message: "Session expired due to inactivity" });
+                    handleInvalidCookie(req, res, next, "Session expired due to inactivity");
                     return;
                 }
             }
@@ -210,7 +232,7 @@ export const createAuthenticationMiddleware = (
                     if (!resolved || !changesState || authMethod !== "session_cookie" || isSessionRevocationRequest(req)) { next(); return; }
                     void dependencies.recordMeaningfulActivity(resolved.session.sessionId, role.role_name!, now)
                         .then((updated) => {
-                            if (!updated) { res.status(401).json({ message: "Session expired" }); return; }
+                            if (!updated) { handleInvalidCookie(req, res, next, "Session expired"); return; }
                             res.cookie(SESSION_COOKIE_NAME, cookie.value!, sessionCookieOptions(sessionIdleTimeoutForRoleMs(role.role_name!)));
                             next();
                         })
@@ -226,15 +248,30 @@ export const createAuthenticationMiddleware = (
 };
 
 export const authenticate = createAuthenticationMiddleware();
+const optionalCookieAuthenticate = createAuthenticationMiddleware({ invalidCookieBehavior: "anonymous" });
 export const optionalAuthenticate = (req: Request, res: Response, next: NextFunction) => {
     const cookie = readSessionCookie(req);
     const bearerToken = getBearerToken(req);
+    if ((cookie.present || cookie.invalid) && bearerToken === null) {
+        return optionalCookieAuthenticate(req, res, next);
+    }
     if (cookie.present || cookie.invalid || bearerToken !== null) {
         return authenticate(req, res, next);
     }
     runWithRequest(req, next);
 };
 export const authenticateRecovery = createAuthenticationMiddleware({ allowRecovery: true });
+const logoutAuthenticate = createAuthenticationMiddleware({ allowRecovery: true, invalidCookieBehavior: "logged-out" });
+export const authenticateLogout = (req: Request, res: Response, next: NextFunction) => {
+    const cookie = readSessionCookie(req);
+    if (getBearerToken(req) !== null) return authenticateRecovery(req, res, next);
+    if (!cookie.present && !cookie.invalid) {
+        clearSessionCookie(res);
+        res.status(204).send();
+        return;
+    }
+    return logoutAuthenticate(req, res, next);
+};
 export const authenticateBootstrap = createAuthenticationMiddleware({ requireCsrf: false });
 export const authenticateRecoveryBootstrap = createAuthenticationMiddleware({ allowRecovery: true, requireCsrf: false });
 

@@ -13,6 +13,14 @@ test.after(async () => { await vite.close(); });
 
 const jsonResponse = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
+test("API accepts an empty 204 logout response without parsing JSON", async () => {
+    api.setCsrfToken("csrf-test-token");
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response(null, { status: 204 });
+    try { assert.equal(await api.apiPost("/auth/logout", {}), null); }
+    finally { globalThis.fetch = originalFetch; api.clearCsrfToken(); }
+});
+
 test("API sends credentialed requests and adds CSRF only to state-changing API calls", async () => {
     api.clearCsrfToken();
     const originalFetch = globalThis.fetch;
@@ -47,6 +55,23 @@ test("API refreshes the CSRF token once after the backend rejects an expired tok
     assert.deepEqual(calls.map((call) => call.url), ["/api/auth/csrf", "/api/profile", "/api/auth/csrf", "/api/profile"]);
     assert.equal(calls[1].csrf, "csrf-old");
     assert.equal(calls[3].csrf, "csrf-new");
+});
+
+test("logout CSRF bootstrap 401 stops before sending logout", async () => {
+    api.clearCsrfToken();
+    const originalFetch = globalThis.fetch;
+    const calls = [];
+    globalThis.fetch = async (url) => {
+        calls.push(String(url));
+        return jsonResponse({ message: "Invalid or expired session" }, 401);
+    };
+    try {
+        await assert.rejects(api.apiPost("/auth/logout", {}), (error) => error.status === 401);
+    } finally {
+        globalThis.fetch = originalFetch;
+        api.clearCsrfToken();
+    }
+    assert.deepEqual(calls, ["/api/auth/csrf"]);
 });
 
 test("recovery requests re-bootstrap CSRF through the restricted recovery endpoint", async () => {

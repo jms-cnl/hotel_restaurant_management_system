@@ -21,9 +21,11 @@ function makeResponse() {
         statusCode: undefined,
         body: undefined,
         cookies: [],
+        clearedCookies: [],
         status(code) { this.statusCode = code; return this; },
         json(body) { this.body = body; return this; },
-        cookie(...args) { this.cookies.push(args); return this; }
+        cookie(...args) { this.cookies.push(args); return this; },
+        clearCookie(...args) { this.clearedCookies.push(args); return this; }
     };
 }
 
@@ -123,6 +125,31 @@ test("an invalid session cookie blocks bearer fallback", async () => {
 
     assert.equal(res.statusCode, 401);
     assert.equal(calls.supabaseToken, undefined);
+    assert.equal(res.clearedCookies[0][0], "hrm_session");
+    assert.equal(res.clearedCookies[0][1].path, "/");
+});
+
+test("malformed session cookies return 401 and are cleared", async () => {
+    const { dependencies } = makeDependencies();
+    const middleware = createAuthenticationMiddleware({}, dependencies);
+    const res = makeResponse();
+
+    await middleware(makeReq({ cookie: "hrm_session=%E0%A4%A" }), res, () => assert.fail("next must not be called"));
+
+    assert.equal(res.statusCode, 401);
+    assert.equal(res.clearedCookies[0][0], "hrm_session");
+    assert.equal(res.clearedCookies[0][1].httpOnly, true);
+});
+
+test("recovery authentication clears stale session cookies on 401", async () => {
+    const { dependencies } = makeDependencies({ resolveSession: async () => null });
+    const middleware = createAuthenticationMiddleware({ allowRecovery: true }, dependencies);
+    const res = makeResponse();
+
+    await middleware(makeReq(), res, () => assert.fail("next must not be called"));
+
+    assert.equal(res.statusCode, 401);
+    assert.equal(res.clearedCookies[0][0], "hrm_session");
 });
 
 test("enforces the current profile role's idle timeout and revokes expired sessions", async () => {
@@ -141,6 +168,7 @@ test("enforces the current profile role's idle timeout and revokes expired sessi
 
     assert.equal(res.statusCode, 401);
     assert.equal(calls.revoked, sessionId);
+    assert.equal(res.clearedCookies[0][0], "hrm_session");
 });
 
 test("permits legacy bearer requests temporarily when no session cookie is present", async () => {
