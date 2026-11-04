@@ -29,7 +29,7 @@ type ReservationRecord = ReservationInput & { reservation_id: number; created_at
 
 export const isSupportedStatusTransition = (from: string, to: string) => {
     if (from === to) return false;
-    return (from === "Pending" && (to === "Confirmed" || to === "Rejected")) ||
+    return (from === "Pending" && (to === "Confirmed" || to === "Rejected" || to === "Cancelled")) ||
         (from === "Confirmed" && (to === "Completed" || to === "Cancelled"));
 };
 
