@@ -21,8 +21,8 @@ const router = Router();
 
 router.get("/", optionalAuthenticate, getTablesController);
 router.get("/:id", optionalAuthenticate, getTableByIdController);
-router.post("/", authenticate, requireRole("Admin", "Staff"), requireRestaurantAccess(restaurantIdFromTableBody), createTableController);
-router.put("/:id", authenticate, requireRole("Admin", "Staff"), requireRestaurantAccess(restaurantIdsFromTableUpdate), updateTableController);
-router.delete("/:id", authenticate, requireRole("Admin", "Staff"), requireRestaurantAccess(restaurantIdsFromTableRecord), deleteTableController);
+router.post("/", authenticate, requireRole("Admin"), requireRestaurantAccess(restaurantIdFromTableBody), createTableController);
+router.put("/:id", authenticate, requireRole("Admin"), requireRestaurantAccess(restaurantIdsFromTableUpdate), updateTableController);
+router.delete("/:id", authenticate, requireRole("Admin"), requireRestaurantAccess(restaurantIdsFromTableRecord), deleteTableController);
 
 export default router;
