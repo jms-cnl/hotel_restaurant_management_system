@@ -55,6 +55,9 @@ export const createAuthSessionClient = (client: AuthApi = defaultApi) => ({
 
     async logout(): Promise<void> {
         try { await client.post("/auth/logout", {}); }
+        catch (error) {
+            if (!(typeof error === "object" && error !== null && "status" in error && error.status === 401)) throw error;
+        }
         finally { client.clearCsrf(); }
     },
 

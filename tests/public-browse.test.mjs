@@ -3,6 +3,9 @@ import test from "node:test";
 
 process.env.SUPABASE_URL = "https://example.supabase.co";
 process.env.SUPABASE_KEY = "sb_publishable_test-anon-key";
+process.env.SUPABASE_SESSION_STORE_SERVICE_ROLE_KEY = "sb_secret_test-credential";
+process.env.HRMS_SESSION_ENCRYPTION_KEY = Buffer.alloc(32, 3).toString("base64");
+process.env.HRMS_SESSION_ENCRYPTION_KEY_VERSION = "1";
 
 const [hotelRouter, roomRouter, restaurantRouter, tableRouter, amenityRouter, authMiddleware, authConfig] = await Promise.all([
     import("../dist/routes/hotel.routes.js"),
@@ -31,8 +34,10 @@ const makeRequest = (params = {}, query = {}, headers = {}) => ({
 const makeResponse = () => ({
     statusCode: 200,
     body: undefined,
+    cookies: [],
     status(code) { this.statusCode = code; return this; },
     json(body) { this.body = body; return this; },
+    clearCookie(...args) { this.cookies.push(args); return this; },
     send() { return this; },
 });
 
@@ -56,10 +61,10 @@ const dbFetch = async (input, init = {}) => {
 const routeFor = (router, method, path) => router.default.stack
     .find((layer) => layer.route?.path === path && layer.route.methods[method])?.route;
 
-const dispatchOptionalGet = async (router, path, params = {}, query = {}) => {
+const dispatchOptionalGet = async (router, path, params = {}, query = {}, headers = {}) => {
     const route = routeFor(router, "get", path);
     assert.ok(route, `Missing GET ${path}`);
-    const req = makeRequest(params, query);
+    const req = makeRequest(params, query, headers);
     const res = makeResponse();
     const [optionalAuth, controller] = route.stack.map((layer) => layer.handle);
     assert.equal(optionalAuth, authMiddleware.optionalAuthenticate);
@@ -142,7 +147,7 @@ test("credentialed GET still authenticates and returns data", async () => {
     } finally { globalThis.fetch = previousFetch; }
 });
 
-test("optional auth preserves the same 401s as authenticate when credentials are invalid", async () => {
+test("optional auth still rejects invalid bearer tokens but ignores malformed cookies", async () => {
     const previousFetch = globalThis.fetch;
     globalThis.fetch = async () => response({ message: "Invalid token", code: "invalid_token" }, 401);
     try {
@@ -158,14 +163,67 @@ test("optional auth preserves the same 401s as authenticate when credentials are
         assert.equal(actual.statusCode, expected.statusCode);
         assert.deepEqual(actual.body, expected.body);
 
-        for (const middleware of [authMiddleware.authenticate, authMiddleware.optionalAuthenticate]) {
-            const req = makeRequest({}, {}, { cookie: `${authConfig.SESSION_COOKIE_NAME}=%E0%A4%A` });
-            const res = makeResponse();
-            await middleware(req, res, () => assert.fail("malformed session cookie was accepted"));
-            assert.equal(res.statusCode, 401);
-            assert.deepEqual(res.body, { message: "Invalid or expired session" });
-        }
+        const authReq = makeRequest({}, {}, { cookie: `${authConfig.SESSION_COOKIE_NAME}=%E0%A4%A` });
+        const authRes = makeResponse();
+        await authMiddleware.authenticate(authReq, authRes, () => assert.fail("authenticate accepted malformed session cookie"));
+        assert.equal(authRes.statusCode, 401);
+        assert.deepEqual(authRes.body, { message: "Invalid or expired session" });
+        assert.equal(authRes.cookies[0][0], authConfig.SESSION_COOKIE_NAME);
+
+        const optionalReq = makeRequest({}, {}, { cookie: `${authConfig.SESSION_COOKIE_NAME}=%E0%A4%A` });
+        const optionalRes = makeResponse();
+        let continued = false;
+        await authMiddleware.optionalAuthenticate(optionalReq, optionalRes, () => { continued = true; });
+        assert.equal(continued, true);
+        assert.equal(optionalReq.auth, undefined);
+        assert.equal(optionalRes.cookies[0][0], authConfig.SESSION_COOKIE_NAME);
     } finally { globalThis.fetch = previousFetch; }
+});
+
+test("public GET treats a stale session cookie as anonymous and clears it", async () => {
+    const { sessionService } = await import("../dist/services/session.service.js");
+    const originalResolve = sessionService.resolveSession;
+    const originalFetch = globalThis.fetch;
+    sessionService.resolveSession = async () => null;
+    globalThis.fetch = dbFetch;
+    try {
+        const { req, res } = await dispatchOptionalGet(hotelRouter, "/", {}, {}, { cookie: "hrm_session=stale-cookie" });
+        assert.equal(req.auth, undefined);
+        assert.equal(res.statusCode, 200);
+        assert.equal(res.cookies[0][0], "hrm_session");
+        assert.equal(res.cookies[0][1].httpOnly, true);
+    } finally {
+        sessionService.resolveSession = originalResolve;
+        globalThis.fetch = originalFetch;
+    }
+});
+
+test("public GET treats an idle-expired cookie session as anonymous and clears it", async () => {
+    const { sessionService } = await import("../dist/services/session.service.js");
+    const originalResolve = sessionService.resolveSession;
+    const originalRevoke = sessionService.revokeCurrentSession;
+    const originalFetch = globalThis.fetch;
+    sessionService.resolveSession = async () => ({
+        session: { sessionId: "expired-session", userId: "customer-1", purpose: "app", scope: "application", lastActivityAt: "2020-01-01T00:00:00.000Z" },
+        credentials: { accessToken: "expired-access-token", refreshToken: "server-only" },
+        csrfTokenHash: Buffer.alloc(32, 1),
+    });
+    sessionService.revokeCurrentSession = async () => true;
+    globalThis.fetch = async (input, init) => {
+        const url = new URL(String(input));
+        if (url.pathname === "/auth/v1/user") return response({ id: "customer-1", email: "guest@example.test" });
+        if (url.pathname === "/rest/v1/user") return response({ user_id: "customer-1", role_id: 3, role: { role_name: "Customer" } });
+        return dbFetch(input, init);
+    };
+    try {
+        const { res } = await dispatchOptionalGet(hotelRouter, "/", {}, {}, { cookie: "hrm_session=idle-expired" });
+        assert.equal(res.statusCode, 200);
+        assert.equal(res.cookies[0][0], "hrm_session");
+    } finally {
+        sessionService.resolveSession = originalResolve;
+        sessionService.revokeCurrentSession = originalRevoke;
+        globalThis.fetch = originalFetch;
+    }
 });
 
 test("anon request client uses the configured public key without a user token", async () => {

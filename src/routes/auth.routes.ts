@@ -5,7 +5,7 @@ import {
     registerController, resetPasswordController, sessionStatusController
 } from "../controllers/auth.controller.js";
 import {
-    authenticate, authenticateBootstrap, authenticateRecovery, authenticateRecoveryBootstrap, requireRecoverySession
+    authenticate, authenticateBootstrap, authenticateLogout, authenticateRecovery, authenticateRecoveryBootstrap, requireRecoverySession
 } from "../middleware/auth.middleware.js";
 import { requireTrustedOrigin } from "../middleware/csrf.middleware.js";
 
@@ -15,7 +15,7 @@ router.post("/register", registerController);
 router.post("/login", loginController);
 router.get("/session", authenticate, sessionStatusController);
 router.post("/csrf", requireTrustedOrigin, authenticateBootstrap, csrfController);
-router.post("/logout", authenticateRecovery, logoutController);
+router.post("/logout", authenticateLogout, logoutController);
 router.post("/change-password", authenticate, changePasswordController);
 router.post("/forgot-password", forgotPasswordController);
 router.post("/recovery/exchange", requireTrustedOrigin, recoveryExchangeController);
