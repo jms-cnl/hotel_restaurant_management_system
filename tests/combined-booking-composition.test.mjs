@@ -50,7 +50,7 @@ const jsonResponse = (body, status = 200) => new Response(JSON.stringify(body), 
     headers: { "Content-Type": "application/json", "Content-Range": "0-0/1" },
 });
 
-const withSuccessfulDatabase = async (action, { roomHotelId = 8, restaurantHotelId = 8, rpcError = null } = {}) => {
+const withSuccessfulDatabase = async (action, { roomHotelId = 8, restaurantHotelId = 8, rpcError = null, reservationInsertError = null } = {}) => {
     const originalFetch = globalThis.fetch;
     const calls = [];
     let nextReservationId = 100;
@@ -82,6 +82,9 @@ const withSuccessfulDatabase = async (action, { roomHotelId = 8, restaurantHotel
         if (table === "notification") {
             return new Response(null, { status: 201 });
         }
+        if (table === "reservation" && method === "POST" && reservationInsertError) {
+            return jsonResponse(reservationInsertError, reservationInsertError.httpStatus ?? 409);
+        }
         if (table === "reservation" && body && typeof body === "object") {
             return jsonResponse({ ...body, reservation_id: nextReservationId++ }, 201);
         }
@@ -93,6 +96,24 @@ const withSuccessfulDatabase = async (action, { roomHotelId = 8, restaurantHotel
         globalThis.fetch = originalFetch;
     }
 };
+
+test("single reservation create maps 23P01 to a safe 409", async () => {
+    await withSuccessfulDatabase(async () => {
+        const response = await invoke(reservationControllers.createReservationController, {
+            ...hotel(), user_id: "customer-1",
+        });
+        assert.equal(response.statusCode, 409);
+        assert.deepEqual(response.body, { message: "This room or table is already booked for that time." });
+    }, { reservationInsertError: { code: "23P01", message: "constraint reservation_room_no_overlap violated", httpStatus: 409 } });
+});
+
+test("combined-booking RPC maps 23P01 to a safe 409", async () => {
+    await withSuccessfulDatabase(async () => {
+        const response = await invoke(createCombinedBookingController, { user_id: "customer-1", reservations: [hotel(), restaurant()] });
+        assert.equal(response.statusCode, 409);
+        assert.deepEqual(response.body, { message: "This room or table is already booked for that time." });
+    }, { rpcError: { code: "23P01", message: "constraint reservation_room_no_overlap violated", httpStatus: 409 } });
+});
 
 const invalidGenericPayloads = [
     ["zero children", []],
