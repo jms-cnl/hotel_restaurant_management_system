@@ -246,7 +246,11 @@ export const createAuthenticationMiddleware = (
                 if (options.requireCsrf === false) afterCsrf();
                 else requireSessionCsrf(req, res, afterCsrf);
             });
-        } catch {
+        } catch (error) {
+            if (error instanceof Error && error.name === "SessionRefreshPendingError") {
+                res.set("Retry-After", "1").status(503).json({ message: "Session refresh is still in progress" });
+                return;
+            }
             res.status(503).json({ message: "Authentication service temporarily unavailable" });
         }
     };

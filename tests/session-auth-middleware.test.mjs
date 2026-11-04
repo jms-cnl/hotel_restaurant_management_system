@@ -7,6 +7,7 @@ process.env.SUPABASE_KEY = "test-publishable-key";
 process.env.SUPABASE_SESSION_STORE_SERVICE_ROLE_KEY = "sb_secret_test-credential";
 
 const { createAuthenticationMiddleware, requireRecoverySession } = await import("../dist/middleware/auth.middleware.js");
+const { SessionRefreshPendingError } = await import("../dist/services/session.service.js");
 const { requireSessionCsrf } = await import("../dist/middleware/csrf.middleware.js");
 const userId = "123e4567-e89b-42d3-a456-426614174001";
 const sessionId = "123e4567-e89b-42d3-a456-426614174000";
@@ -20,9 +21,11 @@ function makeResponse() {
     return {
         statusCode: undefined,
         body: undefined,
+        headers: {},
         cookies: [],
         clearedCookies: [],
         status(code) { this.statusCode = code; return this; },
+        set(name, value) { this.headers[name.toLowerCase()] = value; return this; },
         json(body) { this.body = body; return this; },
         cookie(...args) { this.cookies.push(args); return this; },
         clearCookie(...args) { this.clearedCookies.push(args); return this; }
@@ -144,6 +147,29 @@ test("malformed session cookies return 401 and are cleared", async () => {
 test("recovery authentication clears stale session cookies on 401", async () => {
     const { dependencies } = makeDependencies({ resolveSession: async () => null });
     const middleware = createAuthenticationMiddleware({ allowRecovery: true }, dependencies);
+    const res = makeResponse();
+
+    await middleware(makeReq(), res, () => assert.fail("next must not be called"));
+
+    assert.equal(res.statusCode, 401);
+    assert.equal(res.clearedCookies[0][0], "hrm_session");
+});
+
+test("a refresh lease timeout returns 503 with Retry-After and keeps the cookie", async () => {
+    const { dependencies } = makeDependencies({ resolveSession: async () => { throw new SessionRefreshPendingError(); } });
+    const middleware = createAuthenticationMiddleware({}, dependencies);
+    const res = makeResponse();
+
+    await middleware(makeReq(), res, () => assert.fail("next must not be called"));
+
+    assert.equal(res.statusCode, 503);
+    assert.equal(res.headers["retry-after"], "1");
+    assert.equal(res.clearedCookies.length, 0);
+});
+
+test("a revoked session returns 401 and clears its cookie", async () => {
+    const { dependencies } = makeDependencies({ resolveSession: async () => null });
+    const middleware = createAuthenticationMiddleware({}, dependencies);
     const res = makeResponse();
 
     await middleware(makeReq(), res, () => assert.fail("next must not be called"));
