@@ -86,9 +86,20 @@ export type SessionServiceOptions = {
         refreshToken: string;
         expiresAt: Date;
     }>;
+    wait?: (milliseconds: number) => Promise<void>;
 };
 
 export type ResolveSessionOptions = { allowRecovery?: boolean };
+
+export class SessionRefreshPendingError extends Error {
+    constructor() {
+        super("Session refresh is still in progress");
+        this.name = "SessionRefreshPendingError";
+    }
+}
+
+const refreshPollAttempts = 5;
+const refreshPollIntervalMs = 200;
 
 const defaultStore: SessionServiceStore = {
     createSessionRecord,
@@ -137,6 +148,45 @@ export const createSessionService = (options: SessionServiceOptions = {}) => {
     const makeId = options.makeId ?? randomUUID;
     const makeSecret = options.makeSecret ?? randomBytes;
     const refreshCredentials = options.refreshCredentials ?? refreshWithSupabase;
+    const wait = options.wait ?? ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
+
+    const waitForRefreshWinner = async (cookieBytes: Buffer, original: SessionRecord): Promise<ResolvedSession | null> => {
+        for (let attempt = 0; attempt < refreshPollAttempts; attempt += 1) {
+            await wait(refreshPollIntervalMs);
+            const current = await store.findSessionByCookieSecret(cookieBytes);
+            if (!current || current.revokedAt) return null;
+            const checkTime = now();
+            if (Date.parse(current.idleExpiresAt) <= checkTime.getTime()) {
+                await store.revokeSession({ sessionId: current.sessionId, revokedAt: checkTime });
+                return null;
+            }
+            const credentialsChanged = current.credentialsVersion > original.credentialsVersion
+                || (current.credentials && original.credentials
+                    && (!current.credentials.ciphertext.equals(original.credentials.ciphertext)
+                        || !current.credentials.nonce.equals(original.credentials.nonce)
+                        || !current.credentials.authTag.equals(original.credentials.authTag)
+                        || current.credentials.keyVersion !== original.credentials.keyVersion));
+            if (!credentialsChanged) continue;
+            if (!current.credentials || !current.csrfTokenHash || !current.accessTokenExpiresAt) return null;
+            if (Date.parse(current.accessTokenExpiresAt) <= checkTime.getTime()) continue;
+            let credentials: SessionCredentials;
+            try {
+                credentials = decryptSessionCredentials(current.sessionId, current.userId, current.credentials, getConfig());
+            } catch (error) {
+                if (error instanceof Error && /authentication or payload validation failed/i.test(error.message)) {
+                    await store.revokeSession({ sessionId: current.sessionId, revokedAt: checkTime });
+                    return null;
+                }
+                throw error;
+            }
+            return {
+                session: metadataFromRecord(current),
+                credentials,
+                csrfTokenHash: current.csrfTokenHash
+            };
+        }
+        throw new SessionRefreshPendingError();
+    };
 
     const issueSession = async (
         input: CreateSessionInput,
@@ -241,10 +291,10 @@ export const createSessionService = (options: SessionServiceOptions = {}) => {
         if (expiry - nowAt.getTime() > 60_000) return resolved;
 
         const lease = await claimRefresh(record.sessionId, record.userId, record.credentialsVersion, nowAt);
-        if (!lease) return null;
+        if (!lease) return await waitForRefreshWinner(cookieBytes, record);
         if (!await verifyRefreshLease(lease, nowAt)) {
             await releasePreDispatchRefreshLease(lease, nowAt);
-            return null;
+            return await waitForRefreshWinner(cookieBytes, record);
         }
 
         let refreshed: { accessToken: string; refreshToken: string; expiresAt: Date };

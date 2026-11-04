@@ -179,6 +179,61 @@ test("resolves an expiring session with rotated credentials and a versioned comm
     assert.equal(calls.commit.expectedCredentialsVersion, 0);
 });
 
+test("a lost lease after token rotation fails closed without polling", async () => {
+    const { store, calls, record } = makeStore();
+    const expiringAt = new Date("2026-10-29T00:10:00.000Z");
+    const cookie = Buffer.alloc(32, 2).toString("base64url");
+    record.credentials = encryptSessionCredentials(sessionId, userId, credentials, encryptionConfig);
+    record.accessTokenExpiresAt = "2026-10-29T00:09:00.000Z";
+    let verifyCalls = 0;
+    let waitCalls = 0;
+    let refreshCalls = 0;
+    store.verifyRefreshLease = async () => ++verifyCalls === 1;
+    store.failClosedRefreshLease = async (input) => { calls.failClosed = input; return true; };
+    const service = createSessionService({
+        store,
+        getEncryptionConfig: () => encryptionConfig,
+        now: () => expiringAt,
+        makeId: () => "123e4567-e89b-42d3-a456-426614174010",
+        wait: async () => { waitCalls += 1; },
+        refreshCredentials: async () => {
+            refreshCalls += 1;
+            return { accessToken: "rotated-access", refreshToken: "rotated-refresh", expiresAt: new Date("2026-10-29T01:10:00.000Z") };
+        }
+    });
+
+    assert.equal(await service.resolveSession(cookie, expiringAt), null);
+    assert.equal(refreshCalls, 1);
+    assert.equal(calls.failClosed.leaseId, "123e4567-e89b-42d3-a456-426614174010");
+    assert.equal(waitCalls, 0);
+});
+
+test("a failed credential commit after token rotation fails closed without polling", async () => {
+    const { store, calls, record } = makeStore();
+    const expiringAt = new Date("2026-10-29T00:10:00.000Z");
+    const cookie = Buffer.alloc(32, 2).toString("base64url");
+    record.credentials = encryptSessionCredentials(sessionId, userId, credentials, encryptionConfig);
+    record.accessTokenExpiresAt = "2026-10-29T00:09:00.000Z";
+    let waitCalls = 0;
+    store.failClosedRefreshLease = async (input) => { calls.failClosed = input; return true; };
+    const service = createSessionService({
+        store,
+        getEncryptionConfig: () => encryptionConfig,
+        now: () => expiringAt,
+        makeId: () => "123e4567-e89b-42d3-a456-426614174010",
+        wait: async () => { waitCalls += 1; },
+        refreshCredentials: async () => ({
+            accessToken: "rotated-access",
+            refreshToken: "rotated-refresh",
+            expiresAt: new Date("2026-10-29T01:10:00.000Z")
+        })
+    });
+
+    assert.equal(await service.resolveSession(cookie, expiringAt), null);
+    assert.equal(calls.failClosed.leaseId, "123e4567-e89b-42d3-a456-426614174010");
+    assert.equal(waitCalls, 0);
+});
+
 test("concurrent session resolutions dispatch only one rotating refresh token", async () => {
     const { store, record } = makeStore();
     const expiringAt = new Date("2026-10-29T00:10:00.000Z");
@@ -200,7 +255,18 @@ test("concurrent session resolutions dispatch only one rotating refresh token", 
         return { ...record };
     };
     store.verifyRefreshLease = async () => true;
-    store.commitRefreshedCredentials = async () => true;
+    store.commitRefreshedCredentials = async (input) => {
+        Object.assign(record, {
+            credentials: input.credentials,
+            credentialsVersion: input.expectedCredentialsVersion + 1,
+            accessTokenExpiresAt: input.accessTokenExpiresAt.toISOString(),
+            refreshState: "idle",
+            refreshLockId: null,
+            refreshLeaseUntil: null,
+            refreshStartedAt: null
+        });
+        return true;
+    };
     const rotated = { accessToken: "rotated-access", refreshToken: "rotated-refresh", expiresAt: new Date("2026-10-29T01:10:00.000Z") };
     const service = createSessionService({
         store,
@@ -216,13 +282,64 @@ test("concurrent session resolutions dispatch only one rotating refresh token", 
 
     const first = service.resolveSession(cookie, expiringAt);
     await refreshStarted;
-    const second = await service.resolveSession(cookie, expiringAt);
+    const second = service.resolveSession(cookie, expiringAt);
     finishRefresh(rotated);
-    const firstResolved = await first;
+    const [firstResolved, secondResolved] = await Promise.all([first, second]);
 
-    assert.equal(second, null);
+    assert.equal(secondResolved.session.credentialsVersion, 1);
     assert.equal(refreshCalls, 1);
     assert.deepEqual(firstResolved.credentials, { accessToken: rotated.accessToken, refreshToken: rotated.refreshToken });
+});
+
+test("a lost refresh lease waits for and returns the winner's credentials", async () => {
+    const { store, record } = makeStore();
+    const expiringAt = new Date("2026-10-29T00:10:00.000Z");
+    const cookie = Buffer.alloc(32, 2).toString("base64url");
+    record.credentials = encryptSessionCredentials(sessionId, userId, credentials, encryptionConfig);
+    record.accessTokenExpiresAt = "2026-10-29T00:09:00.000Z";
+    const winnerCredentials = { accessToken: "winner-access", refreshToken: "winner-refresh" };
+    const winnerRecord = {
+        ...record,
+        credentials: encryptSessionCredentials(sessionId, userId, winnerCredentials, encryptionConfig),
+        credentialsVersion: 1,
+        accessTokenExpiresAt: "2026-10-29T01:10:00.000Z"
+    };
+    let lookups = 0;
+    let waits = 0;
+    store.findSessionByCookieSecret = async () => ++lookups === 1 ? { ...record } : { ...winnerRecord };
+    store.claimRefreshLease = async () => null;
+    const service = createSessionService({
+        store,
+        getEncryptionConfig: () => encryptionConfig,
+        now: () => expiringAt,
+        wait: async (ms) => { assert.equal(ms, 200); waits += 1; }
+    });
+
+    const resolved = await service.resolveSession(cookie, expiringAt);
+
+    assert.deepEqual(resolved.credentials, winnerCredentials);
+    assert.equal(resolved.session.credentialsVersion, 1);
+    assert.equal(waits, 1);
+});
+
+test("a lost refresh lease times out as retryable instead of invalidating the session", async () => {
+    const { store, calls, record } = makeStore();
+    const expiringAt = new Date("2026-10-29T00:10:00.000Z");
+    const cookie = Buffer.alloc(32, 2).toString("base64url");
+    record.credentials = encryptSessionCredentials(sessionId, userId, credentials, encryptionConfig);
+    record.accessTokenExpiresAt = "2026-10-29T00:09:00.000Z";
+    let waits = 0;
+    store.claimRefreshLease = async () => null;
+    const service = createSessionService({
+        store,
+        getEncryptionConfig: () => encryptionConfig,
+        now: () => expiringAt,
+        wait: async () => { waits += 1; }
+    });
+
+    await assert.rejects(service.resolveSession(cookie, expiringAt), { name: "SessionRefreshPendingError" });
+    assert.equal(waits, 5);
+    assert.equal(calls.revoke, undefined);
 });
 
 test("fails closed and never retries the old refresh token after an ambiguous error", async () => {
