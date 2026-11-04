@@ -1,6 +1,13 @@
 import { supabase } from "../config/supabase.js";
 import { deleteMediaForEntity } from "./media.service.js";
 
+export class RoomError extends Error {
+    constructor(message: string, public readonly statusCode = 400) {
+        super(message);
+        this.name = "RoomError";
+    }
+}
+
 export const getRooms = async (filters: { status?: string | undefined }) => {
     let query = supabase
         .from("room")
@@ -65,9 +72,12 @@ export const updateRoom = async (
         status?: string;
     }
 ) => {
+    const validFields = new Set(["hotel_id", "room_number", "room_type", "capacity", "price_per_night", "status"]);
+    const updateFields = Object.fromEntries(Object.entries(room).filter(([field]) => validFields.has(field)));
+    if (Object.keys(updateFields).length === 0) throw new RoomError("No valid fields to update");
     const { data, error } = await supabase
         .from("room")
-        .update(room)
+        .update(updateFields)
         .eq("room_id", id)
         .select()
         .single();

@@ -4,7 +4,8 @@ import {
     getRoomById,
     createRoom,
     updateRoom,
-    deleteRoom  
+    deleteRoom,
+    RoomError
 } from "../services/room.service.js";
 
 export const getRoomsController = async (req: Request, res: Response) => {
@@ -61,6 +62,11 @@ export const updateRoomController = async (req: Request, res: Response) => {
         res.json(room);
     } catch (error) {
         console.error(error);
+
+        if (error instanceof RoomError) {
+            res.status(error.statusCode).json({ message: error.message });
+            return;
+        }
 
         res.status(500).json({
             message: "Failed to update room",

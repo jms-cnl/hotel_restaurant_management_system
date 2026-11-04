@@ -1,6 +1,13 @@
 import { supabase } from "../config/supabase.js";
 import { deleteMediaForEntity } from "./media.service.js";
 
+export class TableError extends Error {
+    constructor(message: string, public readonly statusCode = 400) {
+        super(message);
+        this.name = "TableError";
+    }
+}
+
 export const getTables = async (filters: { status?: string | undefined }) => {
     let query = supabase
         .from("restaurant_table")
@@ -61,9 +68,12 @@ export const updateTable = async (
         status?: string;
     }
 ) => {
+    const validFields = new Set(["restaurant_id", "table_number", "capacity", "status"]);
+    const updateFields = Object.fromEntries(Object.entries(table).filter(([field]) => validFields.has(field)));
+    if (Object.keys(updateFields).length === 0) throw new TableError("No valid fields to update");
     const { data, error } = await supabase
         .from("restaurant_table")
-        .update(table)
+        .update(updateFields)
         .eq("table_id", id)
         .select()
         .single();

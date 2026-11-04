@@ -92,9 +92,12 @@ export const updateRestaurant = async (
     }
 ) => {
     if (Object.hasOwn(restaurant, "hotel_id")) throw new RestaurantError("hotel_id cannot be changed");
+    const validFields = new Set(["name", "address", "description", "contact_number", "email", "status"]);
+    const updateFields = Object.fromEntries(Object.entries(restaurant).filter(([field]) => validFields.has(field)));
+    if (Object.keys(updateFields).length === 0) throw new RestaurantError("No valid fields to update");
     const { data, error } = await supabase
         .from("restaurant")
-        .update(restaurant)
+        .update(updateFields)
         .eq("restaurant_id", id)
         .select()
         .single();

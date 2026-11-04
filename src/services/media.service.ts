@@ -29,14 +29,14 @@ export class MediaError extends Error {
 }
 
 const parseEntity = (type: string, id: number): MediaEntity => {
-    if (!(type in entityColumns) || !Number.isInteger(id) || id <= 0) throw new MediaError("Invalid media entity", 400);
+    if (!Object.hasOwn(entityColumns, type) || !Number.isInteger(id) || id <= 0) throw new MediaError("Invalid media entity", 400);
     return { type: type as MediaEntityType, id };
 };
 
 const assertImage = (file: MediaFile) => {
     if (!file || file.size <= 0) throw new MediaError("An image file is required", 400);
     if (file.size > MAX_FILE_SIZE) throw new MediaError("Image must be 5 MB or smaller", 413);
-    if (!(file.mimetype in mimeToType)) throw new MediaError("Only JPG, PNG, and WebP images are supported", 415);
+    if (!Object.hasOwn(mimeToType, file.mimetype)) throw new MediaError("Only JPG, PNG, and WebP images are supported", 415);
 
     const isJpeg = file.mimetype === "image/jpeg" && file.buffer[0] === 0xff && file.buffer[1] === 0xd8;
     const isPng = file.mimetype === "image/png" && file.buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));

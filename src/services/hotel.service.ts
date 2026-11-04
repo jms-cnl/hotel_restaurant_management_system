@@ -1,6 +1,13 @@
 import { supabase } from "../config/supabase.js";
 import { deleteMediaForEntity } from "./media.service.js";
 
+export class HotelError extends Error {
+    constructor(message: string, public readonly statusCode = 400) {
+        super(message);
+        this.name = "HotelError";
+    }
+}
+
 export const getHotels = async (filters: { search?: string | undefined }) => {
     let query = supabase
         .from("hotel")
@@ -65,9 +72,12 @@ export const updateHotel = async (
         status?: string;
     }
 ) => {
+    const validFields = new Set(["name", "address", "description", "contact_number", "email", "status"]);
+    const updateFields = Object.fromEntries(Object.entries(hotel).filter(([field]) => validFields.has(field)));
+    if (Object.keys(updateFields).length === 0) throw new HotelError("No valid fields to update");
     const { data, error } = await supabase
         .from("hotel")
-        .update(hotel)
+        .update(updateFields)
         .eq("hotel_id", id)
         .select()
         .single();
