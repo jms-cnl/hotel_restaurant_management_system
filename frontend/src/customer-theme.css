@@ -7,6 +7,7 @@
 
 .customer-app { min-height: 100vh; color: #f8f7f4; background: #0b1220; font-family: 'DM Sans', sans-serif; }
 .customer-app * { box-sizing: border-box; }
+.customer-app:not(.manager-app):not(.admin-app) a { text-decoration: none; }
 /* =========================================
    MAIN NAVIGATION
 ========================================= */
@@ -1822,17 +1823,22 @@
 .customer-listing-section { margin: 36px 0 48px; }
 .customer-resource-card { overflow: hidden; color: inherit; }
 .customer-card-visual {
+  position: relative;
   display: grid;
   min-height: 172px;
+  overflow: hidden;
   place-items: center;
   background: radial-gradient(circle at 72% 25%, #d8bd8170, transparent 30%), linear-gradient(135deg, #31415a, #162237 68%, #111827);
   color: #e4bd70;
   font-family: 'Playfair Display', serif;
   font-size: 3rem;
 }
+.customer-card-visual img { width: 100%; height: 172px; object-fit: cover; }
 .restaurant-visual { background: radial-gradient(circle at 72% 25%, #bd897050, transparent 30%), linear-gradient(135deg, #3e3340, #1b2433 68%, #111827); }
 .customer-card-description { min-height: 42px; color: #aab4c4; }
 .customer-resource-count { color: #c1c8d4; font-size: 0.88rem; }
+.customer-filter-note { margin: 0; color: #aab4c4; font-size: 0.75rem; text-align: left; }
+.restaurant-filter-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .customer-empty-state, .customer-state {
   margin: 20px 0;
   padding: 28px;

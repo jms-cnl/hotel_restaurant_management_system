@@ -1,9 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+    filterHotels,
+    filterRestaurants,
     buildCombinedBookingPayload,
     buildHotelReservationPayload,
     buildRestaurantReservationPayload,
+    getAddressLocations,
+    getBudgetTier,
     filterResources,
     filterReservations,
     isVenueBookable,
@@ -18,6 +22,44 @@ test("filterResources searches names and addresses and applies status", () => {
     assert.deepEqual(filterResources(resources, "cavite", "all"), [resources[0]]);
     assert.deepEqual(filterResources(resources, "hotel", "Inactive"), [resources[1]]);
     assert.deepEqual(filterResources(resources, "missing", "all"), []);
+});
+
+test("budget tiers use the lowest available nightly room rate", () => {
+    assert.equal(getBudgetTier(2500), "budget-friendly");
+    assert.equal(getBudgetTier(2500.01), "moderate");
+    assert.equal(getBudgetTier(5000), "moderate");
+    assert.equal(getBudgetTier(5000.01), "premium");
+});
+
+test("hotel filters use address, available room rates, and room availability", () => {
+    const hotels = [
+        { hotel_id: 1, name: "Garden Hotel", address: "Silang, Cavite", status: "Active" },
+        { hotel_id: 2, name: "City Hotel", address: "Manila", status: "Active" },
+        { hotel_id: 3, name: "Inactive Hotel", address: "Silang, Cavite", status: "Inactive" },
+    ];
+    const rooms = [
+        { room_id: 11, hotel_id: 1, price_per_night: 2500, status: "Available" },
+        { room_id: 12, hotel_id: 1, price_per_night: 1800, status: "Reserved" },
+        { room_id: 21, hotel_id: 2, price_per_night: 5200, status: "Available" },
+        { room_id: 31, hotel_id: 3, price_per_night: 1900, status: "Available" },
+    ];
+
+    assert.deepEqual(filterHotels(hotels, rooms, { location: "Silang", budgetTier: "budget-friendly", availability: "available" }), [hotels[0]]);
+    assert.deepEqual(filterHotels(hotels, rooms, { availability: "unavailable" }), [hotels[2]]);
+});
+
+test("restaurant filters use address and available tables without a budget field", () => {
+    const restaurants = [
+        { restaurant_id: 1, name: "Garden Table", address: "Tagaytay, Cavite", status: "Active" },
+        { restaurant_id: 2, name: "City Bistro", address: "Manila", status: "Active" },
+    ];
+    const tables = [
+        { table_id: 11, restaurant_id: 1, status: "Available" },
+        { table_id: 21, restaurant_id: 2, status: "Reserved" },
+    ];
+
+    assert.deepEqual(filterRestaurants(restaurants, tables, { location: "Tagaytay", availability: "available" }), [restaurants[0]]);
+    assert.deepEqual(getAddressLocations(restaurants), ["Tagaytay", "Manila"]);
 });
 
 test("only active venues can be booked", () => {
