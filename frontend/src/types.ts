@@ -35,7 +35,8 @@ export type Hotel = { hotel_id: number; name: string; address: string; descripti
 export type Restaurant = { restaurant_id: number; name: string; address: string; description?: string | null; contact_number: string; email?: string | null; status: string };
 export type Room = { room_id: number; hotel_id: number; room_number: string; room_type: string; capacity: number; price_per_night: number; status: string; hotel?: Hotel };
 export type RestaurantTable = { table_id: number; restaurant_id: number; table_number: string; capacity: number; status: string; restaurant?: Restaurant };
-export type ReservationStatus = "Pending" | "Confirmed" | "Rejected" | "Completed" | "Cancelled";
+export const RESERVATION_STATUSES = ["Pending", "Confirmed", "Rejected", "Cancelled", "Completed"] as const;
+export type ReservationStatus = typeof RESERVATION_STATUSES[number];
 export type Reservation = {
     reservation_id: number;
     user_id: string;

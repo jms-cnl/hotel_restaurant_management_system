@@ -19,6 +19,8 @@ import { AdminInventoryPage } from "./components/AdminInventoryPage";
 import { AdminAmenitiesPage } from "./components/AdminAmenitiesPage";
 import { AdminUsersPage } from "./components/AdminUsersPage";
 import { MediaManager } from "./components/MediaManager";
+import { AdminDashboard, AdminNotifications } from "./components/AdminPages";
+import { AdminManage } from "./components/AdminManage";
 
 const role = (user: User | null) => user?.role?.role_name ?? "Customer";
 const isManager = (user: User | null) => ["Admin", "Staff"].includes(role(user));
@@ -114,6 +116,11 @@ function AuthPage({ registerMode = false }: { registerMode?: boolean }) {
 }
 
 function Dashboard() {
+    const { user } = useAuth();
+    return isAdmin(user) ? <AdminDashboard /> : <StaffDashboard />;
+}
+
+function StaffDashboard() {
     const { user } = useAuth();
     const [data, setData] = useState<Record<string, number> | null>(null); const [items, setItems] = useState<Reservation[]>([]); const [reservationsLoading, setReservationsLoading] = useState(true); const [rooms, setRooms] = useState<Room[]>([]); const [tables, setTables] = useState<RestaurantTable[]>([]); const [error, setError] = useState("");
     useEffect(() => {
@@ -326,14 +333,23 @@ function CombinedBookingsRoute() {
     return isManager(user) ? <CombinedBookings /> : <CustomerCombinedBookings />;
 }
 
+function ManageRoute() {
+    const { user } = useAuth();
+    return isAdmin(user) ? <AdminManage /> : <Reservations manageView />;
+}
+
 function Notifications() {
     const { user } = useAuth();
-    const manager = isManager(user);
+    if (isAdmin(user)) return <AdminNotifications />;
+    return isManager(user) ? <ManagerNotifications /> : <CustomerNotifications />;
+}
+
+function ManagerNotifications() {
     const [items, setItems] = useState<Record<string, unknown>[]>([]); const [error, setError] = useState(""); const [loading, setLoading] = useState(true);
     const load = () => { setLoading(true); return apiGet<Record<string, unknown>[]>("/notifications").then(setItems).catch(e => setError(e.message)).finally(() => setLoading(false)); };
     useEffect(() => { void load(); }, []);
     const markRead = async (id: number) => { try { await apiPatch(`/notifications/${id}/read`, {}); load(); } catch (e) { setError(e instanceof Error ? e.message : "Unable to update notification"); } };
-    if (manager) return <section className="listing-section">
+    return <section className="listing-section">
         <h1>Notifications</h1>
         {error && <div className="alert error">{error}</div>}
         {loading ? <p>Loading...</p> : items.length ? <div className="reservation-list">{items.map(item => <article className="reservation-card" key={String(item.notification_id)}>
@@ -344,6 +360,13 @@ function Notifications() {
             </div>
         </article>)}</div> : <p>Your notifications will appear here.</p>}
     </section>;
+}
+
+function CustomerNotifications() {
+    const [items, setItems] = useState<Record<string, unknown>[]>([]); const [error, setError] = useState(""); const [loading, setLoading] = useState(true);
+    const load = () => { setLoading(true); return apiGet<Record<string, unknown>[]>("/notifications").then(setItems).catch(e => setError(e.message)).finally(() => setLoading(false)); };
+    useEffect(() => { void load(); }, []);
+    const markRead = async (id: number) => { try { await apiPatch(`/notifications/${id}/read`, {}); load(); } catch (e) { setError(e instanceof Error ? e.message : "Unable to update notification"); } };
     return <Page title="Notifications" error={error} loading={loading}>{items.length ? <div className="detail"><ul>{items.map(item => <li key={String(item.notification_id)}><strong>{String(item.title)}</strong>: {String(item.message)} <small>{item.created_at ? new Date(String(item.created_at)).toLocaleString() : ""}</small> {Boolean(item.is_read) ? <span>Read</span> : <button onClick={() => markRead(Number(item.notification_id))}>Mark read</button>}</li>)}</ul></div> : <p className="empty">No notifications.</p>}</Page>;
 }
 
@@ -747,5 +770,5 @@ function Profile() {
 }
 
 export function App() {
-    return <Routes><Route path="/login" element={<AuthPage />} /><Route path="/register" element={<AuthPage registerMode />} /><Route path="/forgot-password" element={<ForgotPassword />} /><Route path="/reset-password" element={<ResetPassword />} /><Route path="*" element={<Protected><AppLayout><Routes><Route path="/" element={<LandingRedirect />} /><Route path="/home" element={<Home />} /><Route path="/dashboard" element={<RoleRoute roles={["Staff", "Admin"]}><Dashboard /></RoleRoute>} /><Route path="/properties" element={<RoleRoute roles={["Staff", "Admin"]}><Properties /></RoleRoute>} /><Route path="/hotels" element={<HotelCatalogRoute />} /><Route path="/hotels/:hotelId" element={<PropertyDetailsRoute />} /><Route path="/restaurants" element={<RestaurantCatalogRoute />} /><Route path="/restaurants/:restaurantId" element={<RestaurantDetailsRoute />} /><Route path="/rooms" element={<RoleRoute roles={["Staff", "Admin"]}><ManagerInventoryRoute kind="rooms" /></RoleRoute>} /><Route path="/tables" element={<RoleRoute roles={["Staff", "Admin"]}><ManagerInventoryRoute kind="tables" /></RoleRoute>} /><Route path="/amenities" element={<RoleRoute roles={["Admin"]}><AdminAmenitiesPage /></RoleRoute>} /><Route path="/reservations" element={<ReservationsRoute />} /><Route path="/manage" element={<RoleRoute roles={["Staff", "Admin"]}><Reservations manageView /></RoleRoute>} /><Route path="/combined-bookings" element={<CombinedBookingsRoute />} /><Route path="/reports" element={<RoleRoute roles={["Staff", "Admin"]}><Reports /></RoleRoute>} /><Route path="/users" element={<RoleRoute roles={["Admin"]}><Users /></RoleRoute>} /><Route path="/notifications" element={<Notifications />} /><Route path="/profile" element={<Profile />} /><Route path="*" element={<Navigate to="/home" replace />} /></Routes></AppLayout></Protected>} /></Routes>;
+    return <Routes><Route path="/login" element={<AuthPage />} /><Route path="/register" element={<AuthPage registerMode />} /><Route path="/forgot-password" element={<ForgotPassword />} /><Route path="/reset-password" element={<ResetPassword />} /><Route path="*" element={<Protected><AppLayout><Routes><Route path="/" element={<LandingRedirect />} /><Route path="/home" element={<Home />} /><Route path="/dashboard" element={<RoleRoute roles={["Staff", "Admin"]}><Dashboard /></RoleRoute>} /><Route path="/properties" element={<RoleRoute roles={["Staff", "Admin"]}><Properties /></RoleRoute>} /><Route path="/hotels" element={<HotelCatalogRoute />} /><Route path="/hotels/:hotelId" element={<PropertyDetailsRoute />} /><Route path="/restaurants" element={<RestaurantCatalogRoute />} /><Route path="/restaurants/:restaurantId" element={<RestaurantDetailsRoute />} /><Route path="/rooms" element={<RoleRoute roles={["Staff", "Admin"]}><ManagerInventoryRoute kind="rooms" /></RoleRoute>} /><Route path="/tables" element={<RoleRoute roles={["Staff", "Admin"]}><ManagerInventoryRoute kind="tables" /></RoleRoute>} /><Route path="/amenities" element={<RoleRoute roles={["Admin"]}><AdminAmenitiesPage /></RoleRoute>} /><Route path="/reservations" element={<ReservationsRoute />} /><Route path="/manage" element={<RoleRoute roles={["Staff", "Admin"]}><ManageRoute /></RoleRoute>} /><Route path="/combined-bookings" element={<CombinedBookingsRoute />} /><Route path="/reports" element={<RoleRoute roles={["Staff", "Admin"]}><Reports /></RoleRoute>} /><Route path="/users" element={<RoleRoute roles={["Admin"]}><Users /></RoleRoute>} /><Route path="/notifications" element={<Notifications />} /><Route path="/profile" element={<Profile />} /><Route path="*" element={<Navigate to="/home" replace />} /></Routes></AppLayout></Protected>} /></Routes>;
 }
