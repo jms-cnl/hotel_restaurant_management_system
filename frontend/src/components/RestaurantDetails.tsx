@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiGet, apiPost } from "../api";
 import { buildRestaurantReservationPayload, isVenueBookable } from "../customerData";
@@ -15,6 +15,8 @@ export function RestaurantDetails() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const [message, setMessage] = useState("");
+    const refreshedPrimaryImage = useRef(false);
+    const refreshingMedia = useRef(false);
 
     useEffect(() => {
         let active = true;
@@ -23,6 +25,7 @@ export function RestaurantDetails() {
         setRestaurant(null);
         setTables([]);
         setMedia([]);
+        refreshedPrimaryImage.current = false;
         if (!Number.isInteger(id) || id <= 0) {
             setError("Restaurant not found");
             setLoading(false);
@@ -44,6 +47,14 @@ export function RestaurantDetails() {
     }, [id]);
 
     const primaryImage = useMemo(() => media.find((item) => item.is_primary) ?? media[0], [media]);
+    const refreshExpiredMedia = async () => {
+        if (refreshedPrimaryImage.current || refreshingMedia.current) return;
+        refreshedPrimaryImage.current = true;
+        refreshingMedia.current = true;
+        try { setMedia(await apiGet<Media[]>(`/media/restaurant/${id}`)); }
+        catch { /* Keep the existing image state if a signed URL refresh fails. */ }
+        finally { refreshingMedia.current = false; }
+    };
     const venueBookable = isVenueBookable(restaurant?.status);
     const reserve = async (event: FormEvent) => {
         event.preventDefault();
@@ -69,7 +80,7 @@ export function RestaurantDetails() {
     return <div className="restaurant-detail-page">
         <Link to="/restaurants" className="restaurant-back-link">← Back to restaurants</Link>
         <div className="restaurant-detail-gallery">
-            {primaryImage ? <img className="restaurant-detail-main-image" src={primaryImage.url} alt={restaurant.name} /> : <div className="customer-detail-placeholder restaurant-visual" role="img" aria-label="Restaurant image not available"><span>R</span></div>}
+            {primaryImage ? <img className="restaurant-detail-main-image" src={primaryImage.url} alt={restaurant.name} onError={() => void refreshExpiredMedia()} /> : <div className="customer-detail-placeholder restaurant-visual" role="img" aria-label="Restaurant image not available"><span>R</span></div>}
             <div className="restaurant-detail-side-images"><div className="customer-detail-placeholder restaurant-visual" aria-hidden="true" /><div className="customer-detail-placeholder restaurant-visual" aria-hidden="true" /></div>
         </div>
         <div className="restaurant-detail-heading"><div><p className="eyebrow">RESTAURANT · {restaurant.status}</p><h1>{restaurant.name}</h1><p>📍 {restaurant.address}</p>{restaurant.contact_number && <p>{restaurant.contact_number}{restaurant.email ? ` · ${restaurant.email}` : ""}</p>}</div></div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiGet, apiPost } from "../api";
 import { buildHotelReservationPayload, isVenueBookable } from "../customerData";
@@ -16,6 +16,8 @@ export function HotelDetails() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
     const [message, setMessage] = useState("");
+    const refreshedPrimaryImage = useRef(false);
+    const refreshingMedia = useRef(false);
 
     useEffect(() => {
         let active = true;
@@ -24,6 +26,7 @@ export function HotelDetails() {
         setHotel(null);
         setRooms([]);
         setMedia([]);
+        refreshedPrimaryImage.current = false;
         if (!Number.isInteger(id) || id <= 0) {
             setError("Hotel not found");
             setLoading(false);
@@ -45,6 +48,14 @@ export function HotelDetails() {
     }, [id]);
 
     const primaryImage = useMemo(() => media.find((item) => item.is_primary) ?? media[0], [media]);
+    const refreshExpiredMedia = async () => {
+        if (refreshedPrimaryImage.current || refreshingMedia.current) return;
+        refreshedPrimaryImage.current = true;
+        refreshingMedia.current = true;
+        try { setMedia(await apiGet<Media[]>(`/media/hotel/${id}`)); }
+        catch { /* Keep the existing image state if a signed URL refresh fails. */ }
+        finally { refreshingMedia.current = false; }
+    };
     const venueBookable = isVenueBookable(hotel?.status);
     const book = async (event: FormEvent) => {
         event.preventDefault();
@@ -70,7 +81,7 @@ export function HotelDetails() {
     return <div className="hotel-detail-page">
         <Link to="/hotels" className="hotel-back-link">← Back to hotels</Link>
         <div className="hotel-detail-gallery">
-            {primaryImage ? <img className="hotel-detail-main-image" src={primaryImage.url} alt={hotel.name} /> : <div className="customer-detail-placeholder hotel-visual" role="img" aria-label="Hotel image not available"><span>H</span></div>}
+            {primaryImage ? <img className="hotel-detail-main-image" src={primaryImage.url} alt={hotel.name} onError={() => void refreshExpiredMedia()} /> : <div className="customer-detail-placeholder hotel-visual" role="img" aria-label="Hotel image not available"><span>H</span></div>}
             <div className="hotel-detail-side-images"><div className="customer-detail-placeholder hotel-visual" aria-hidden="true" /><div className="customer-detail-placeholder hotel-visual" aria-hidden="true" /></div>
         </div>
         <div className="hotel-detail-heading"><div><p className="eyebrow">HOTEL · {hotel.status}</p><h1>{hotel.name}</h1><p>📍 {hotel.address}</p>{hotel.contact_number && <p>{hotel.contact_number}{hotel.email ? ` · ${hotel.email}` : ""}</p>}</div></div>

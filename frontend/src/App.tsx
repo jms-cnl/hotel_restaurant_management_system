@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useNavigate, useParams } from "react-router-dom";
-import { apiDelete, apiGet, apiPatch, apiPost, apiPut, apiUpload, reportMeaningfulActivity } from "./api";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut, reportMeaningfulActivity } from "./api";
 import { authSession } from "./auth-session";
 import { useAuth } from "./auth";
 import { CustomerHome } from "./components/CustomerHome";
@@ -14,7 +14,9 @@ import { CustomerReservations } from "./components/CustomerReservations";
 import { CustomerCombinedBookings } from "./components/CustomerCombinedBookings";
 import { buildCombinedBookingPayload } from "./customerData";
 import { passwordErrors, passwordRequirements } from "./passwordPolicy";
-import type { CombinedBooking, Hotel, Media, Reservation, ReservationHistory, Restaurant, RestaurantTable, Room, User } from "./types";
+import type { CombinedBooking, Hotel, Reservation, ReservationHistory, Restaurant, RestaurantTable, Room, User } from "./types";
+import { AdminInventoryPage } from "./components/AdminInventoryPage";
+import { MediaManager } from "./components/MediaManager";
 
 const role = (user: User | null) => user?.role?.role_name ?? "Customer";
 const isManager = (user: User | null) => ["Admin", "Staff"].includes(role(user));
@@ -299,12 +301,17 @@ function StaffPropertyDetails({ restaurantMode = false }: { restaurantMode?: boo
 
 function HotelCatalogRoute() {
     const { user } = useAuth();
-    return isManager(user) ? <ResourcePage kind="hotels" /> : <HotelDiscovery />;
+    return isAdmin(user) ? <AdminInventoryPage kind="hotels" /> : isManager(user) ? <ResourcePage kind="hotels" /> : <HotelDiscovery />;
 }
 
 function RestaurantCatalogRoute() {
     const { user } = useAuth();
-    return isManager(user) ? <ResourcePage kind="restaurants" /> : <RestaurantDiscovery />;
+    return isAdmin(user) ? <AdminInventoryPage kind="restaurants" /> : isManager(user) ? <ResourcePage kind="restaurants" /> : <RestaurantDiscovery />;
+}
+
+function ManagerInventoryRoute({ kind }: { kind: "rooms" | "tables" }) {
+    const { user } = useAuth();
+    return isAdmin(user) ? <AdminInventoryPage kind={kind} /> : <ResourcePage kind={kind} />;
 }
 
 function ReservationsRoute() {
@@ -449,26 +456,14 @@ const resourceConfigs: Record<keyof typeof mediaEntityTypes, ResourceConfig> = {
 
 const mediaEntityTypes = { hotels: "hotel", restaurants: "restaurant", rooms: "room", tables: "table" } as const;
 
-function MediaManager({ entityType, entityId, manager }: { entityType: keyof typeof mediaEntityTypes; entityId: number; manager: boolean }) {
-    const [items, setItems] = useState<Media[]>([]); const [file, setFile] = useState<File | null>(null); const [error, setError] = useState(""); const [message, setMessage] = useState("");
-    const load = () => apiGet<Media[]>(`/media/${mediaEntityTypes[entityType]}/${entityId}`).then(setItems).catch(e => setError(e.message));
-    useEffect(() => { setError(""); setMessage(""); load(); }, [entityType, entityId]);
-    const upload = async (event: FormEvent) => { event.preventDefault(); if (!file) return; setError(""); try { await apiUpload(`/media/${mediaEntityTypes[entityType]}/${entityId}`, file); setFile(null); setMessage("Image uploaded"); load(); } catch (e) { setError(e instanceof Error ? e.message : "Upload failed"); } };
-    const replace = async (mediaId: number, replacement: File | undefined) => { if (!replacement) return; try { await apiUpload(`/media/${mediaId}/file`, replacement, {}, "PUT"); setMessage("Image replaced"); load(); } catch (e) { setError(e instanceof Error ? e.message : "Replace failed"); } };
-    const primary = async (mediaId: number) => { try { await apiPatch(`/media/${mediaId}/primary`, {}); setMessage("Primary image updated"); load(); } catch (e) { setError(e instanceof Error ? e.message : "Primary image update failed"); } };
-    const reorder = async (media: Media, value: string) => { try { await apiPatch(`/media/${media.media_id}/order`, { display_order: Number(value) }); setMessage("Image order updated"); load(); } catch (e) { setError(e instanceof Error ? e.message : "Order update failed"); } };
-    const remove = async (mediaId: number) => { if (!confirm("Delete this image?")) return; try { await apiDelete(`/media/${mediaId}`); setMessage("Image deleted"); load(); } catch (e) { setError(e instanceof Error ? e.message : "Delete failed"); } };
-    return <div className="media-manager"><h3>Images</h3>{error && <div className="alert error">{error}</div>}{message && <div className="alert success">{message}</div>}{items.length ? <div className="media-grid">{items.map(media => <div className="media-item" key={media.media_id}><img src={media.url} alt={`${media.image_type} media`} /><div><strong>{media.is_primary ? "Primary image" : "Image"}</strong><span>Order: {media.display_order}</span></div>{manager && <div className="media-actions"><button onClick={() => primary(media.media_id)} disabled={media.is_primary}>Set primary</button><label>Replace<input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => replace(media.media_id, e.target.files?.[0])} /></label><label>Order<input type="number" min="0" defaultValue={media.display_order} onBlur={e => reorder(media, e.target.value)} /></label><button onClick={() => remove(media.media_id)}>Delete</button></div>}</div>)}</div> : <p className="empty">No images available.</p>}{manager && <form className="media-upload" onSubmit={upload}><label>Upload image<input type="file" accept="image/jpeg,image/png,image/webp" required onChange={e => setFile(e.target.files?.[0] ?? null)} /></label><button type="submit">Upload</button></form>}</div>;
-}
-
 function ResourcePage({ kind }: { kind: keyof typeof mediaEntityTypes }) {
-    const config = resourceConfigs[kind]; const { user } = useAuth(); const manager = isManager(user); const [mediaEntity, setMediaEntity] = useState<number | null>(null);
+    const config = resourceConfigs[kind]; const { user } = useAuth(); const manager = isAdmin(user); const [mediaEntity, setMediaEntity] = useState<number | null>(null);
     const [items, setItems] = useState<Record<string, unknown>[]>([]); const [form, setForm] = useState<Record<string, string>>({}); const [editing, setEditing] = useState<number | null>(null); const [filter, setFilter] = useState(""); const [error, setError] = useState(""); const [loading, setLoading] = useState(true);
     const load = () => { setLoading(true); const query = config.search && filter ? `?${config.search}=${encodeURIComponent(filter)}` : ""; apiGet<Record<string, unknown>[]>(`${config.endpoint}${query}`).then(setItems).catch(e => setError(e.message)).finally(() => setLoading(false)); };
     useEffect(load, [filter]);
     const submit = async (event: FormEvent) => { event.preventDefault(); setError(""); try { const payload: Record<string, unknown> = { ...form }; for (const field of ["hotel_id", "restaurant_id", "capacity", "price_per_night"]) if (payload[field] !== undefined && payload[field] !== "") payload[field] = Number(payload[field]); if (editing) await apiPut(`${config.endpoint}/${editing}`, payload); else await apiPost(config.endpoint, payload); setForm({}); setEditing(null); load(); } catch (e) { setError(e instanceof Error ? e.message : "Save failed"); } };
     const remove = async (id: number) => { if (!confirm("Delete this record?")) return; try { await apiDelete(`${config.endpoint}/${id}`); load(); } catch (e) { setError(e instanceof Error ? e.message : "Delete failed"); } };
-    return <Page title={config.title} error={error} loading={loading}><div className="toolbar">{config.search && <input placeholder="Search" value={filter} onChange={e => setFilter(e.target.value)} />}</div><div className="table-wrap"><table><thead><tr>{config.fields.map(field => <th key={field}>{field}</th>)}<th>Media</th>{manager && <th>Actions</th>}</tr></thead><tbody>{items.map(item => <tr key={String(item[config.id])}>{config.fields.map(field => <td key={field}>{String(item[field] ?? "")}</td>)}<td><button onClick={() => setMediaEntity(Number(item[config.id]))}>View images</button></td>{manager && <td><button onClick={() => { setEditing(Number(item[config.id])); setForm(Object.fromEntries(config.fields.map(field => [field, String(item[field] ?? "")]))); }}>Edit</button> <button onClick={() => remove(Number(item[config.id]))}>Delete</button></td>}</tr>)}</tbody></table>{!items.length && <p className="empty">No records found.</p>}</div>{mediaEntity !== null && <MediaManager entityType={kind} entityId={mediaEntity} manager={manager} />}{manager && <form className="form-panel inline-form" onSubmit={submit}><h2>{editing ? `Edit ${config.title.slice(0, -1)}` : `Add ${config.title.slice(0, -1)}`}</h2>{config.fields.map(field => <label key={field}>{field}<input required={!field.includes("description") && field !== "email"} value={form[field] ?? ""} onChange={e => setForm({ ...form, [field]: e.target.value })} /></label>)}<button type="submit">Save</button>{editing && <button type="button" onClick={() => { setEditing(null); setForm({}); }}>Cancel</button>}</form>}</Page>;
+    return <Page title={config.title} error={error} loading={loading}><div className="toolbar">{config.search && <input placeholder="Search" value={filter} onChange={e => setFilter(e.target.value)} />}</div><div className="table-wrap"><table><thead><tr>{config.fields.map(field => <th key={field}>{field}</th>)}<th>Media</th>{manager && <th>Actions</th>}</tr></thead><tbody>{items.map(item => <tr key={String(item[config.id])}>{config.fields.map(field => <td key={field}>{String(item[field] ?? "")}</td>)}<td><button onClick={() => setMediaEntity(Number(item[config.id]))}>View images</button></td>{manager && <td><button onClick={() => { setEditing(Number(item[config.id])); setForm(Object.fromEntries(config.fields.map(field => [field, String(item[field] ?? "")]))); }}>Edit</button> <button onClick={() => remove(Number(item[config.id]))}>Delete</button></td>}</tr>)}</tbody></table>{!items.length && <p className="empty">No records found.</p>}</div>{mediaEntity !== null && <MediaManager entityType={mediaEntityTypes[kind]} entityId={mediaEntity} manager={manager} />}{manager && <form className="form-panel inline-form" onSubmit={submit}><h2>{editing ? `Edit ${config.title.slice(0, -1)}` : `Add ${config.title.slice(0, -1)}`}</h2>{config.fields.map(field => <label key={field}>{field}<input required={!field.includes("description") && field !== "email"} value={form[field] ?? ""} onChange={e => setForm({ ...form, [field]: e.target.value })} /></label>)}<button type="submit">Save</button>{editing && <button type="button" onClick={() => { setEditing(null); setForm({}); }}>Cancel</button>}</form>}</Page>;
 }
 
 function CombinedStayWizard({ user, onCreated }: { user: User | null; onCreated: () => void }) {
@@ -749,5 +744,5 @@ function Profile() {
 }
 
 export function App() {
-    return <Routes><Route path="/login" element={<AuthPage />} /><Route path="/register" element={<AuthPage registerMode />} /><Route path="/forgot-password" element={<ForgotPassword />} /><Route path="/reset-password" element={<ResetPassword />} /><Route path="*" element={<Protected><AppLayout><Routes><Route path="/" element={<LandingRedirect />} /><Route path="/home" element={<Home />} /><Route path="/dashboard" element={<RoleRoute roles={["Staff", "Admin"]}><Dashboard /></RoleRoute>} /><Route path="/properties" element={<RoleRoute roles={["Staff", "Admin"]}><Properties /></RoleRoute>} /><Route path="/hotels" element={<HotelCatalogRoute />} /><Route path="/hotels/:hotelId" element={<PropertyDetailsRoute />} /><Route path="/restaurants" element={<RestaurantCatalogRoute />} /><Route path="/restaurants/:restaurantId" element={<RestaurantDetailsRoute />} /><Route path="/rooms" element={<RoleRoute roles={["Staff", "Admin"]}><ResourcePage kind="rooms" /></RoleRoute>} /><Route path="/tables" element={<RoleRoute roles={["Staff", "Admin"]}><ResourcePage kind="tables" /></RoleRoute>} /><Route path="/amenities" element={<RoleRoute roles={["Admin"]}><ManagerPlaceholder title="Amenities" description="Manage hotel amenities and their room and restaurant links." /></RoleRoute>} /><Route path="/reservations" element={<ReservationsRoute />} /><Route path="/manage" element={<RoleRoute roles={["Staff", "Admin"]}><Reservations manageView /></RoleRoute>} /><Route path="/combined-bookings" element={<CombinedBookingsRoute />} /><Route path="/reports" element={<RoleRoute roles={["Staff", "Admin"]}><Reports /></RoleRoute>} /><Route path="/users" element={<RoleRoute roles={["Admin"]}><Users /></RoleRoute>} /><Route path="/notifications" element={<Notifications />} /><Route path="/profile" element={<Profile />} /><Route path="*" element={<Navigate to="/home" replace />} /></Routes></AppLayout></Protected>} /></Routes>;
+    return <Routes><Route path="/login" element={<AuthPage />} /><Route path="/register" element={<AuthPage registerMode />} /><Route path="/forgot-password" element={<ForgotPassword />} /><Route path="/reset-password" element={<ResetPassword />} /><Route path="*" element={<Protected><AppLayout><Routes><Route path="/" element={<LandingRedirect />} /><Route path="/home" element={<Home />} /><Route path="/dashboard" element={<RoleRoute roles={["Staff", "Admin"]}><Dashboard /></RoleRoute>} /><Route path="/properties" element={<RoleRoute roles={["Staff", "Admin"]}><Properties /></RoleRoute>} /><Route path="/hotels" element={<HotelCatalogRoute />} /><Route path="/hotels/:hotelId" element={<PropertyDetailsRoute />} /><Route path="/restaurants" element={<RestaurantCatalogRoute />} /><Route path="/restaurants/:restaurantId" element={<RestaurantDetailsRoute />} /><Route path="/rooms" element={<RoleRoute roles={["Staff", "Admin"]}><ManagerInventoryRoute kind="rooms" /></RoleRoute>} /><Route path="/tables" element={<RoleRoute roles={["Staff", "Admin"]}><ManagerInventoryRoute kind="tables" /></RoleRoute>} /><Route path="/amenities" element={<RoleRoute roles={["Admin"]}><ManagerPlaceholder title="Amenities" description="Manage hotel amenities and their room and restaurant links." /></RoleRoute>} /><Route path="/reservations" element={<ReservationsRoute />} /><Route path="/manage" element={<RoleRoute roles={["Staff", "Admin"]}><Reservations manageView /></RoleRoute>} /><Route path="/combined-bookings" element={<CombinedBookingsRoute />} /><Route path="/reports" element={<RoleRoute roles={["Staff", "Admin"]}><Reports /></RoleRoute>} /><Route path="/users" element={<RoleRoute roles={["Admin"]}><Users /></RoleRoute>} /><Route path="/notifications" element={<Notifications />} /><Route path="/profile" element={<Profile />} /><Route path="*" element={<Navigate to="/home" replace />} /></Routes></AppLayout></Protected>} /></Routes>;
 }
