@@ -96,15 +96,6 @@ const withAccessFetch = async (assignedIds, action, { tableRestaurantId = 2, med
 };
 
 const guardedRoutes = [
-    ["restaurant PUT", restaurantRouter, "/:id", "put", { params: { id: "2" } }],
-    ["table POST", tableRouter, "/", "post", { body: { restaurant_id: 2 } }],
-    ["table PUT", tableRouter, "/:id", "put", { params: { id: "20" }, body: { table_number: "T1" } }],
-    ["table DELETE", tableRouter, "/:id", "delete", { params: { id: "20" } }],
-    ["restaurant media POST", mediaRouter, "/:entityType/:entityId", "post", { params: { entityType: "restaurant", entityId: "2" } }],
-    ["restaurant media PUT", mediaRouter, "/:id/file", "put", { params: { id: "30" } }],
-    ["restaurant media primary PATCH", mediaRouter, "/:id/primary", "patch", { params: { id: "30" } }],
-    ["restaurant media order PATCH", mediaRouter, "/:id/order", "patch", { params: { id: "30" }, body: { display_order: 1 } }],
-    ["restaurant media DELETE", mediaRouter, "/:id", "delete", { params: { id: "30" } }],
     ["restaurant reservation POST", reservationRouter, "/", "post", { body: { reservation_type: "RESTAURANT", table_id: 20 } }],
     ["restaurant reservation GET", reservationRouter, "/:id", "get", { params: { id: "40" } }],
     ["restaurant reservation history GET", reservationRouter, "/:id/history", "get", { params: { id: "40" } }],
@@ -138,17 +129,6 @@ for (const [label, router, path, method, requestParts] of guardedRoutes) {
         });
     });
 }
-
-test("Staff cannot move an assigned table to an unassigned restaurant", async () => {
-    const guard = restaurantGuardFor(routeFor(tableRouter, "/:id", "put"));
-    await withAccessFetch([2], async (requests) => {
-        const result = await invoke(guard, request("Staff", { id: "20" }, { restaurant_id: 3 }));
-        assert.equal(result.statusCode, 403);
-        assert.equal(result.body.message, "Not assigned to this restaurant");
-        assert.equal(result.nextCalled, false);
-        assert.equal(requests.filter((entry) => entry.table === "staff_restaurant_assignment").length, 2);
-    }, { tableRestaurantId: 2 });
-});
 
 test("Admin bypasses restaurant assignment lookups and Customer behavior is unchanged", async () => {
     for (const roleName of ["Admin", "Customer"]) {

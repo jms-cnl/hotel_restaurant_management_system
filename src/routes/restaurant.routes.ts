@@ -19,11 +19,11 @@ const router = Router();
 
 router.get("/", optionalAuthenticate, getRestaurantsController);
 router.get("/:restaurantId/amenities", optionalAuthenticate, getRestaurantAmenitiesController);
-router.post("/:restaurantId/amenities", authenticate, requireRole("Admin", "Staff"), restaurantAmenityAccess, addRestaurantAmenityController);
-router.delete("/:restaurantId/amenities/:amenityId", authenticate, requireRole("Admin", "Staff"), restaurantAmenityAccess, deleteRestaurantAmenityController);
+router.post("/:restaurantId/amenities", authenticate, requireRole("Admin"), restaurantAmenityAccess, addRestaurantAmenityController);
+router.delete("/:restaurantId/amenities/:amenityId", authenticate, requireRole("Admin"), restaurantAmenityAccess, deleteRestaurantAmenityController);
 router.get("/:id", optionalAuthenticate, getRestaurantByIdController);
 router.post("/", authenticate, requireRole("Admin"), createRestaurantController);
-router.put("/:id", authenticate, requireRole("Admin", "Staff"), requireRestaurantAccess(restaurantIdFromParam("id")), updateRestaurantController);
+router.put("/:id", authenticate, requireRole("Admin"), requireRestaurantAccess(restaurantIdFromParam("id")), updateRestaurantController);
 router.delete("/:id", authenticate, requireRole("Admin"), deleteRestaurantController);
 
 export default router;
