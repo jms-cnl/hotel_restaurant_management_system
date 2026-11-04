@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { InvalidStatusError } from "../constants/status.js";
 import { 
     getHotels, 
     getHotelById,
@@ -41,6 +42,10 @@ export const createHotelController = async (req: Request, res: Response) => {
 
         res.status(201).json(hotel);
     } catch (error) {
+    if (error instanceof InvalidStatusError) {
+        res.status(error.statusCode).json({ message: error.message });
+        return;
+    }
     console.error(error);
 
     res.status(500).json({
@@ -58,6 +63,11 @@ export const updateHotelController = async (req: Request, res: Response) => {
         res.json(hotel);
     } catch (error) {
         console.error(error);
+
+        if (error instanceof InvalidStatusError) {
+            res.status(error.statusCode).json({ message: error.message });
+            return;
+        }
 
         if (error instanceof HotelError) {
             res.status(error.statusCode).json({ message: error.message });

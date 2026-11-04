@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { InvalidStatusError } from "../constants/status.js";
 import { 
     getRooms,  
     getRoomById,
@@ -48,6 +49,11 @@ export const createRoomController = async (req: Request, res: Response) => {
     } catch (error) {
         console.error(error);
 
+        if (error instanceof InvalidStatusError) {
+            res.status(error.statusCode).json({ message: error.message });
+            return;
+        }
+
         res.status(500).json({
             message: "Failed to create room",
             error: error
@@ -62,6 +68,11 @@ export const updateRoomController = async (req: Request, res: Response) => {
         res.json(room);
     } catch (error) {
         console.error(error);
+
+        if (error instanceof InvalidStatusError) {
+            res.status(error.statusCode).json({ message: error.message });
+            return;
+        }
 
         if (error instanceof RoomError) {
             res.status(error.statusCode).json({ message: error.message });

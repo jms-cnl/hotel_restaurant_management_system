@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { InvalidStatusError } from "../constants/status.js";
 import {  getTables, 
     getTableById, 
     createTable, 
@@ -44,6 +45,11 @@ export const createTableController = async (req: Request, res: Response) => {
     } catch (error) {
         console.error(error);
 
+        if (error instanceof InvalidStatusError) {
+            res.status(error.statusCode).json({ message: error.message });
+            return;
+        }
+
         res.status(500).json({
             message: "Failed to create table"
         });
@@ -57,6 +63,11 @@ export const updateTableController = async (req: Request, res: Response) => {
         res.json(table);
     } catch (error) {
         console.error(error);
+
+        if (error instanceof InvalidStatusError) {
+            res.status(error.statusCode).json({ message: error.message });
+            return;
+        }
 
         if (error instanceof TableError) {
             res.status(error.statusCode).json({ message: error.message });

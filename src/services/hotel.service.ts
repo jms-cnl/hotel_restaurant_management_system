@@ -1,4 +1,5 @@
 import { supabase } from "../config/supabase.js";
+import { canonicalizeStatus, HOTEL_STATUSES } from "../constants/status.js";
 import { deleteMediaForEntity } from "./media.service.js";
 
 export class HotelError extends Error {
@@ -46,11 +47,15 @@ export const createHotel = async (hotel: {
     description?: string;
     contact_number: string;
     email?: string;
-    status: string;
+    status?: unknown;
 }) => {
+    const normalizedHotel = {
+        ...hotel,
+        status: canonicalizeStatus(hotel.status, "hotel", HOTEL_STATUSES, "Active")
+    };
     const { data, error } = await supabase
         .from("hotel")
-        .insert(hotel)
+        .insert(normalizedHotel)
         .select()
         .single();
 
@@ -69,11 +74,15 @@ export const updateHotel = async (
         description?: string;
         contact_number?: string;
         email?: string;
-        status?: string;
+        status?: unknown;
     }
 ) => {
     const validFields = new Set(["name", "address", "description", "contact_number", "email", "status"]);
     const updateFields = Object.fromEntries(Object.entries(hotel).filter(([field]) => validFields.has(field)));
+    if (Object.hasOwn(updateFields, "status")) {
+        if (updateFields.status === undefined) delete updateFields.status;
+        else updateFields.status = canonicalizeStatus(updateFields.status, "hotel", HOTEL_STATUSES, "Active");
+    }
     if (Object.keys(updateFields).length === 0) throw new HotelError("No valid fields to update");
     const { data, error } = await supabase
         .from("hotel")

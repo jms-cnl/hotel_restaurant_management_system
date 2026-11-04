@@ -1,5 +1,26 @@
 export type RoleName = "Customer" | "Staff" | "Admin";
 
+export const HOTEL_RESTAURANT_STATUSES = ["Active", "Inactive", "Suspended"] as const;
+export const ROOM_TABLE_STATUSES = ["Available", "Reserved", "Occupied", "Maintenance"] as const;
+
+export type InventoryResourceKind = "hotels" | "restaurants" | "rooms" | "tables";
+
+export const statusOptionsFor = (kind: InventoryResourceKind) =>
+    kind === "hotels" || kind === "restaurants" ? HOTEL_RESTAURANT_STATUSES : ROOM_TABLE_STATUSES;
+
+export const defaultStatusFor = (kind: InventoryResourceKind) => statusOptionsFor(kind)[0];
+
+export const normalizeResourceStatus = (value: unknown, allowedStatuses: readonly string[]) => {
+    if (typeof value !== "string") return undefined;
+    const normalized = value.trim().toLocaleLowerCase();
+    return allowedStatuses.find((status) => status.toLocaleLowerCase() === normalized);
+};
+
+export const resourceStatusClass = (value: unknown, allowedStatuses: readonly string[]) => {
+    const canonical = normalizeResourceStatus(value, allowedStatuses);
+    return canonical ? canonical.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-") : "unknown";
+};
+
 export type User = {
     user_id: string;
     role_id: number;
