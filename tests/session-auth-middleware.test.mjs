@@ -185,16 +185,23 @@ test("permits legacy bearer requests temporarily when no session cookie is prese
     assert.equal(req.auth.authMethod, "legacy_bearer");
 });
 
-test("rejects recovery sessions from ordinary routes and recognizes them only on recovery auth", async () => {
-    const { dependencies } = makeDependencies({
-        resolveSession: async (_cookie, _now, options) => options.allowRecovery ? makeResolvedSession({
-            session: { ...makeResolvedSession().session, purpose: "recovery", scope: "password_reset" }
-        }) : null
+test("rejects recovery sessions from ordinary routes without clearing or revoking them", async () => {
+    const { dependencies, calls } = makeDependencies({
+        resolveSession: async (_cookie, _now, options) => {
+            calls.allowRecovery = options.allowRecovery;
+            return options.allowRecovery ? makeResolvedSession({
+                session: { ...makeResolvedSession().session, purpose: "recovery", scope: "password_reset" }
+            }) : null;
+        }
     });
     const ordinary = createAuthenticationMiddleware({}, dependencies);
     const res = makeResponse();
     await ordinary(makeReq(), res, () => assert.fail("recovery session must be rejected"));
-    assert.equal(res.statusCode, 401);
+    assert.equal(res.statusCode, 403);
+    assert.deepEqual(res.body, { message: "Recovery sessions cannot access application routes" });
+    assert.deepEqual(res.clearedCookies, []);
+    assert.equal(calls.revoked, undefined);
+    assert.equal(calls.allowRecovery, true);
 
     const recovery = createAuthenticationMiddleware({ allowRecovery: true }, dependencies);
     const recoveryReq = makeReq({ method: "POST", path: "/api/auth/reset-password" });
@@ -203,6 +210,7 @@ test("rejects recovery sessions from ordinary routes and recognizes them only on
     let continued = false;
     await recovery(recoveryReq, recoveryRes, () => { continued = true; });
     assert.equal(continued, true);
+    assert.equal(recoveryRes.statusCode, undefined);
 
     let recoveryGuardContinued = false;
     requireRecoverySession(recoveryReq, makeResponse(), () => { recoveryGuardContinued = true; });

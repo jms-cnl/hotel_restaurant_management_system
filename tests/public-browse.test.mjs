@@ -61,10 +61,11 @@ const dbFetch = async (input, init = {}) => {
 const routeFor = (router, method, path) => router.default.stack
     .find((layer) => layer.route?.path === path && layer.route.methods[method])?.route;
 
-const dispatchOptionalGet = async (router, path, params = {}, query = {}, headers = {}) => {
+const dispatchOptionalGet = async (router, path, params = {}, query = {}, headers = {}, auth = undefined) => {
     const route = routeFor(router, "get", path);
     assert.ok(route, `Missing GET ${path}`);
     const req = makeRequest(params, query, headers);
+    if (auth) req.auth = auth;
     const res = makeResponse();
     const [optionalAuth, controller] = route.stack.map((layer) => layer.handle);
     assert.equal(optionalAuth, authMiddleware.optionalAuthenticate);
@@ -192,6 +193,49 @@ test("public GET treats a stale session cookie as anonymous and clears it", asyn
         assert.equal(res.statusCode, 200);
         assert.equal(res.cookies[0][0], "hrm_session");
         assert.equal(res.cookies[0][1].httpOnly, true);
+    } finally {
+        sessionService.resolveSession = originalResolve;
+        globalThis.fetch = originalFetch;
+    }
+});
+
+test("public GET treats a valid recovery cookie as anonymous and keeps it", async () => {
+    const { sessionService } = await import("../dist/services/session.service.js");
+    const originalResolve = sessionService.resolveSession;
+    const originalFetch = globalThis.fetch;
+    sessionService.resolveSession = async (_secret, _now, options) => {
+        assert.equal(options.allowRecovery, true);
+        return {
+            session: { sessionId: "recovery-session", userId: "customer-1", purpose: "recovery", scope: "password_reset" },
+            credentials: { accessToken: "recovery-access-token", refreshToken: "server-only" },
+            csrfTokenHash: Buffer.alloc(32, 1),
+        };
+    };
+    globalThis.fetch = async (input, init = {}) => {
+        const url = new URL(String(input));
+        if (url.pathname === "/auth/v1/user") {
+            assert.equal(new Headers(init.headers).get("authorization"), "Bearer recovery-access-token");
+            return response({ id: "customer-1", email: "guest@example.test" });
+        }
+        if (url.pathname === "/rest/v1/user") assert.fail("recovery session should not be treated as an application user");
+        if (url.pathname.startsWith("/rest/v1/")) {
+            assert.notEqual(new Headers(init.headers).get("authorization"), "Bearer recovery-access-token");
+            return dbFetch(input, init);
+        }
+        throw new Error(`Unexpected request ${url}`);
+    };
+    try {
+        const { req, res } = await dispatchOptionalGet(
+            hotelRouter,
+            "/",
+            {},
+            {},
+            { cookie: "hrm_session=recovery-cookie" },
+            { accessToken: "preexisting-recovery-token", sessionPurpose: "recovery" },
+        );
+        assert.equal(req.auth, undefined);
+        assert.equal(res.statusCode, 200);
+        assert.deepEqual(res.cookies, []);
     } finally {
         sessionService.resolveSession = originalResolve;
         globalThis.fetch = originalFetch;
