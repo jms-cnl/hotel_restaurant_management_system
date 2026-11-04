@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { apiDelete, apiGet, apiPost, apiPut } from "../api";
+import { defaultStatusFor, normalizeResourceStatus, resourceStatusClass, statusOptionsFor, type InventoryResourceKind } from "../types";
 import { MediaManager } from "./MediaManager";
 
-type ResourceKind = "hotels" | "restaurants" | "rooms" | "tables";
+type ResourceKind = InventoryResourceKind;
 type RecordData = Record<string, unknown>;
 type AmenityRecord = { amenity_id: number; name: string; description?: string | null };
 type FieldType = "text" | "number" | "email" | "select";
@@ -28,8 +29,6 @@ type ModalState =
     | { mode: "edit" | "view"; record: RecordData }
     | null;
 
-const roomStatuses = ["Available", "Reserved", "Occupied", "Maintenance"];
-
 const definitions: Record<ResourceKind, ResourceDefinition> = {
     hotels: {
         label: "Hotels",
@@ -44,7 +43,7 @@ const definitions: Record<ResourceKind, ResourceDefinition> = {
             { key: "description", label: "Description", type: "text" },
             { key: "contact_number", label: "Contact Number", type: "text", required: true },
             { key: "email", label: "Email", type: "email" },
-            { key: "status", label: "Status", type: "text", required: true },
+            { key: "status", label: "Status", type: "select", required: true, options: [...statusOptionsFor("hotels")] },
         ],
     },
     restaurants: {
@@ -60,7 +59,7 @@ const definitions: Record<ResourceKind, ResourceDefinition> = {
             { key: "description", label: "Description", type: "text" },
             { key: "contact_number", label: "Contact Number", type: "text", required: true },
             { key: "email", label: "Email", type: "email" },
-            { key: "status", label: "Status", type: "text", required: true },
+            { key: "status", label: "Status", type: "select", required: true, options: [...statusOptionsFor("restaurants")] },
         ],
     },
     rooms: {
@@ -76,7 +75,7 @@ const definitions: Record<ResourceKind, ResourceDefinition> = {
             { key: "room_type", label: "Room Type", type: "select", required: true, options: ["Standard Room", "Deluxe Room", "Family Room", "Suite"] },
             { key: "capacity", label: "Capacity", type: "number", required: true, min: 1 },
             { key: "price_per_night", label: "Price per Night (₱)", type: "number", required: true, min: 0 },
-            { key: "status", label: "Room Status", type: "select", required: true, options: roomStatuses },
+            { key: "status", label: "Room Status", type: "select", required: true, options: [...statusOptionsFor("rooms")] },
         ],
     },
     tables: {
@@ -90,13 +89,12 @@ const definitions: Record<ResourceKind, ResourceDefinition> = {
             { key: "restaurant_id", label: "Restaurant ID", type: "number", required: true, min: 1 },
             { key: "table_number", label: "Table Number", type: "text", required: true },
             { key: "capacity", label: "Seating Capacity", type: "number", required: true, min: 1 },
-            { key: "status", label: "Table Status", type: "select", required: true, options: roomStatuses },
+            { key: "status", label: "Table Status", type: "select", required: true, options: [...statusOptionsFor("tables")] },
         ],
     },
 };
 
 const asText = (value: unknown) => value === null || value === undefined ? "" : String(value);
-const statusClass = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
 export function AdminInventoryPage({ kind }: { kind: ResourceKind }) {
     const definition = definitions[kind];
@@ -148,23 +146,21 @@ export function AdminInventoryPage({ kind }: { kind: ResourceKind }) {
         const query = search.trim().toLowerCase();
         return records.filter((record) => {
             const matchesSearch = !query || definition.fields.some((field) => asText(record[field.key]).toLowerCase().includes(query));
-            const status = definition.statusField ? asText(record[definition.statusField]) : "";
+            const status = definition.statusField ? normalizeResourceStatus(record[definition.statusField], statusOptionsFor(kind)) : undefined;
             return matchesSearch && (statusFilter === "All Statuses" || status === statusFilter);
         });
-    }, [records, search, statusFilter, definition]);
+    }, [records, search, statusFilter, definition, kind]);
 
-    const statusOptions = definition.statusField
-        ? Array.from(new Set([...definition.fields.find((field) => field.key === definition.statusField)?.options ?? [], ...records.map((record) => asText(record[definition.statusField!]))])).filter(Boolean)
-        : [];
+    const statusOptions = definition.statusField ? statusOptionsFor(kind) : [];
     const pageCount = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
     const currentPage = Math.min(page, pageCount);
     const visibleRecords = filteredRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-    const activeCount = definition.statusField ? records.filter((record) => asText(record[definition.statusField!]).toLowerCase() === "active").length : 0;
-    const availableCount = definition.statusField ? records.filter((record) => asText(record[definition.statusField!]).toLowerCase() === "available").length : 0;
+    const summaryStatus = kind === "rooms" || kind === "tables" ? "Available" : "Active";
+    const summaryCount = definition.statusField ? records.filter((record) => normalizeResourceStatus(record[definition.statusField!], statusOptionsFor(kind)) === summaryStatus).length : 0;
 
     const closeModal = () => { setModal(null); setFormValues({}); setNotice(""); setAvailableAmenities([]); setLinkedAmenities([]); setSelectedAmenities([]); setRoomAmenitiesLoaded(false); };
     const openCreate = () => {
-        setFormValues(Object.fromEntries(definition.fields.map((field) => [field.key, field.options?.[0] && field.key === "status" ? field.options[0] : ""])));
+        setFormValues(Object.fromEntries(definition.fields.map((field) => [field.key, field.key === "status" ? defaultStatusFor(kind) : ""])));
         setSelectedAmenities([]);
         setLinkedAmenities([]);
         setRoomAmenitiesLoaded(true);
@@ -254,7 +250,7 @@ export function AdminInventoryPage({ kind }: { kind: ResourceKind }) {
         {error && <div className="admin-crud-form-error" role="alert">{error}</div>}
         <div className="admin-crud-summary">
             <div className="admin-crud-summary-card"><span>Total {definition.label}</span><strong>{records.length}</strong></div>
-            {definition.statusField && <div className="admin-crud-summary-card"><span>{kind === "rooms" || kind === "tables" ? "Available" : "Active"}</span><strong>{kind === "rooms" || kind === "tables" ? availableCount : activeCount}</strong></div>}
+            {definition.statusField && <div className="admin-crud-summary-card"><span>{summaryStatus}</span><strong>{summaryCount}</strong></div>}
         </div>
 
         <div className="admin-crud-panel">
@@ -276,7 +272,8 @@ export function AdminInventoryPage({ kind }: { kind: ResourceKind }) {
                     <thead><tr>{definition.fields.map((field) => <th key={field.key}>{field.label}</th>)}<th className="admin-crud-actions-heading">Actions</th></tr></thead>
                     <tbody>{visibleRecords.map((record) => <tr key={String(record[definition.idField])}>{definition.fields.map((field) => {
                         const value = asText(record[field.key]);
-                        return <td key={field.key}>{field.key === definition.statusField ? <span className={`admin-crud-status ${statusClass(value)}`}>{value}</span> : value || "—"}</td>;
+                        const canonicalStatus = field.key === definition.statusField ? normalizeResourceStatus(value, statusOptionsFor(kind)) : undefined;
+                        return <td key={field.key}>{field.key === definition.statusField ? <span className={`admin-crud-status ${resourceStatusClass(value, statusOptionsFor(kind))}`}>{canonicalStatus ?? value}</span> : value || "—"}</td>;
                     })}<td><div className="admin-crud-row-actions"><button type="button" className="admin-crud-view" onClick={() => openView(record)}>View</button><button type="button" className="admin-crud-edit" onClick={() => openEdit(record)}>Edit</button><button type="button" className="admin-crud-delete" onClick={() => void deleteRecord(record)}>Delete</button></div></td></tr>)}</tbody>
                 </table>}
             </div>

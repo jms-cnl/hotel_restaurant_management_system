@@ -1,4 +1,5 @@
 import { supabase } from "../config/supabase.js";
+import { canonicalizeStatus, RESTAURANT_STATUSES } from "../constants/status.js";
 import { deleteMediaForEntity } from "./media.service.js";
 
 export class RestaurantError extends Error {
@@ -46,7 +47,7 @@ export const createRestaurant = async (restaurant: {
     description?: string;
     contact_number: string;
     email?: string;
-    status: string;
+    status?: unknown;
     hotel_id?: number;
 }) => {
     if (restaurant.hotel_id !== undefined && (!Number.isInteger(restaurant.hotel_id) || restaurant.hotel_id <= 0)) {
@@ -67,6 +68,7 @@ export const createRestaurant = async (restaurant: {
 
     if (hotelId === undefined || hotelId === null) throw new RestaurantError("hotel_id is required");
     const { hotel_id: _requestedHotelId, ...restaurantFields } = restaurant;
+    restaurantFields.status = canonicalizeStatus(restaurant.status, "restaurant", RESTAURANT_STATUSES, "Active");
     const { data, error } = await supabase
         .from("restaurant")
         .insert({ ...restaurantFields, hotel_id: hotelId })
@@ -88,12 +90,16 @@ export const updateRestaurant = async (
         description?: string;
         contact_number?: string;
         email?: string;
-        status?: string;
+        status?: unknown;
     }
 ) => {
     if (Object.hasOwn(restaurant, "hotel_id")) throw new RestaurantError("hotel_id cannot be changed");
     const validFields = new Set(["name", "address", "description", "contact_number", "email", "status"]);
     const updateFields = Object.fromEntries(Object.entries(restaurant).filter(([field]) => validFields.has(field)));
+    if (Object.hasOwn(updateFields, "status")) {
+        if (updateFields.status === undefined) delete updateFields.status;
+        else updateFields.status = canonicalizeStatus(updateFields.status, "restaurant", RESTAURANT_STATUSES, "Active");
+    }
     if (Object.keys(updateFields).length === 0) throw new RestaurantError("No valid fields to update");
     const { data, error } = await supabase
         .from("restaurant")

@@ -1,4 +1,5 @@
 import { supabase } from "../config/supabase.js";
+import { canonicalizeStatus, ROOM_STATUSES } from "../constants/status.js";
 import { deleteMediaForEntity } from "./media.service.js";
 
 export class RoomError extends Error {
@@ -46,11 +47,15 @@ export const createRoom = async (room: {
     room_type: string;
     capacity: number;
     price_per_night: number;
-    status: string;
+    status?: unknown;
 }) => {
+    const normalizedRoom = {
+        ...room,
+        status: canonicalizeStatus(room.status, "room", ROOM_STATUSES, "Available")
+    };
     const { data, error } = await supabase
         .from("room")
-        .insert(room)
+        .insert(normalizedRoom)
         .select()
         .single();
 
@@ -69,11 +74,15 @@ export const updateRoom = async (
         room_type?: string;
         capacity?: number;
         price_per_night?: number;
-        status?: string;
+        status?: unknown;
     }
 ) => {
     const validFields = new Set(["hotel_id", "room_number", "room_type", "capacity", "price_per_night", "status"]);
     const updateFields = Object.fromEntries(Object.entries(room).filter(([field]) => validFields.has(field)));
+    if (Object.hasOwn(updateFields, "status")) {
+        if (updateFields.status === undefined) delete updateFields.status;
+        else updateFields.status = canonicalizeStatus(updateFields.status, "room", ROOM_STATUSES, "Available");
+    }
     if (Object.keys(updateFields).length === 0) throw new RoomError("No valid fields to update");
     const { data, error } = await supabase
         .from("room")
