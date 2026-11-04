@@ -5,6 +5,7 @@ import {
     createHotel,
     updateHotel,
     deleteHotel,
+    HotelError,
 } from "../services/hotel.service.js";
 
 export const getHotelsController = async (req: Request, res: Response) => {
@@ -57,6 +58,11 @@ export const updateHotelController = async (req: Request, res: Response) => {
         res.json(hotel);
     } catch (error) {
         console.error(error);
+
+        if (error instanceof HotelError) {
+            res.status(error.statusCode).json({ message: error.message });
+            return;
+        }
 
         res.status(500).json({
             message: "Failed to update hotel",

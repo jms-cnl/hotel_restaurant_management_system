@@ -61,10 +61,25 @@ export const updateCurrentUserController = async (req: Request, res: Response) =
         res.json(profile);
     } catch (error) {
         console.error(error);
+        const databaseError = error && typeof error === "object" ? error as {
+            status?: unknown;
+            statusCode?: unknown;
+            code?: unknown;
+            details?: unknown;
+            message?: unknown;
+        } : {};
+        const status = Number(databaseError.status ?? databaseError.statusCode);
+        const code = typeof databaseError.code === "string" ? databaseError.code : "";
+        const details = `${String(databaseError.details ?? "")} ${String(databaseError.message ?? "")}`;
 
-        res.status(401).json({
-            message: "Failed to update current user profile",
-            error: error
-        });
+        if (status === 400 || code.startsWith("22") || code.startsWith("23")) {
+            res.status(400).json({ message: "Invalid profile update" });
+        } else if (status === 403 || code === "42501") {
+            res.status(403).json({ message: "Forbidden" });
+        } else if (status === 404 || (code === "PGRST116" && /0 rows/i.test(details))) {
+            res.status(404).json({ message: "User profile not found" });
+        } else {
+            res.status(500).json({ message: "Failed to update current user profile" });
+        }
     }
 };

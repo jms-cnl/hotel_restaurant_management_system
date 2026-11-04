@@ -3,7 +3,8 @@ import {  getTables,
     getTableById, 
     createTable, 
     updateTable, 
-    deleteTable} from "../services/table.service.js";
+    deleteTable,
+    TableError} from "../services/table.service.js";
 
 export const getTablesController = async (req: Request, res: Response) => {
     try {
@@ -56,6 +57,11 @@ export const updateTableController = async (req: Request, res: Response) => {
         res.json(table);
     } catch (error) {
         console.error(error);
+
+        if (error instanceof TableError) {
+            res.status(error.statusCode).json({ message: error.message });
+            return;
+        }
 
         res.status(500).json({
             message: "Failed to update table"
