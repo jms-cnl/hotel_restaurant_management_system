@@ -5,6 +5,7 @@ import { authSession } from "./auth-session";
 import { useAuth } from "./auth";
 import { CustomerHome } from "./components/CustomerHome";
 import { CustomerLayout } from "./components/CustomerLayout";
+import { AdminLayout } from "./components/AdminLayout";
 import { HotelDetails } from "./components/HotelDetails";
 import { HotelDiscovery } from "./components/HotelDiscovery";
 import { RestaurantDetails } from "./components/RestaurantDetails";
@@ -38,6 +39,7 @@ function AppLayout({ children }: { children: ReactNode }) {
     const navigate = useNavigate();
     const warning = sessionWarning && <div className="alert error" role="status">Your session will expire in two minutes due to inactivity. Save your work.</div>;
     if (!isManager(user)) return <CustomerLayout>{warning}{children}</CustomerLayout>;
+    if (isAdmin(user)) return <AdminLayout warning={warning}>{children}</AdminLayout>;
     const staffName = userName(user);
     return <div className="manager-app customer-app">
         <header className="customer-navbar">
@@ -50,14 +52,6 @@ function AppLayout({ children }: { children: ReactNode }) {
                 <NavLink to="/properties">Hotels &amp; Restaurants</NavLink>
                 <NavLink to="/reservations">Reservations</NavLink>
                 <NavLink to="/manage">Manage</NavLink>
-                {isAdmin(user) && <>
-                    <NavLink to="/hotels">Hotels</NavLink>
-                    <NavLink to="/restaurants">Restaurants</NavLink>
-                    <NavLink to="/rooms">Rooms</NavLink>
-                    <NavLink to="/tables">Tables</NavLink>
-                    <NavLink to="/reports">Reports</NavLink>
-                    <NavLink to="/users">Users</NavLink>
-                </>}
             </nav>
             <div className="customer-nav-actions">
                 <NavLink to="/profile" className="customer-profile-link">
@@ -345,7 +339,26 @@ function Notifications() {
 }
 
 function Users() {
-    return <Page title="Users"><div className="detail"><p>User management is reserved for Admin users. The current backend exposes profile management only; administrative user CRUD is not yet available.</p></div></Page>;
+    return <ManagerPlaceholder title="Users & Staff Assignments" description="Manage user roles and restaurant assignments." />;
+}
+
+function ManagerPlaceholder({ title, description }: { title: string; description: string }) {
+    const { user } = useAuth();
+    return <section className="listing-section admin-page">
+        <div className="admin-page-heading">
+            <div>
+                <p className="eyebrow">SERENITY HOTEL &amp; RESTAURANT</p>
+                <h1>{title}</h1>
+                <p className="staff-manage-description">{description}</p>
+            </div>
+            <span className="staff-dashboard-badge">{role(user)}</span>
+        </div>
+        <div className="admin-empty">
+            <span aria-hidden="true">—</span>
+            <strong>Nothing to display</strong>
+            <p>This page is not connected yet.</p>
+        </div>
+    </section>;
 }
 
 function ForgotPassword() {
@@ -736,5 +749,5 @@ function Profile() {
 }
 
 export function App() {
-    return <Routes><Route path="/login" element={<AuthPage />} /><Route path="/register" element={<AuthPage registerMode />} /><Route path="/forgot-password" element={<ForgotPassword />} /><Route path="/reset-password" element={<ResetPassword />} /><Route path="*" element={<Protected><AppLayout><Routes><Route path="/" element={<LandingRedirect />} /><Route path="/home" element={<Home />} /><Route path="/dashboard" element={<RoleRoute roles={["Staff", "Admin"]}><Dashboard /></RoleRoute>} /><Route path="/properties" element={<RoleRoute roles={["Staff", "Admin"]}><Properties /></RoleRoute>} /><Route path="/hotels" element={<HotelCatalogRoute />} /><Route path="/hotels/:hotelId" element={<PropertyDetailsRoute />} /><Route path="/restaurants" element={<RestaurantCatalogRoute />} /><Route path="/restaurants/:restaurantId" element={<RestaurantDetailsRoute />} /><Route path="/rooms" element={<RoleRoute roles={["Staff", "Admin"]}><ResourcePage kind="rooms" /></RoleRoute>} /><Route path="/tables" element={<RoleRoute roles={["Staff", "Admin"]}><ResourcePage kind="tables" /></RoleRoute>} /><Route path="/reservations" element={<ReservationsRoute />} /><Route path="/manage" element={<RoleRoute roles={["Staff", "Admin"]}><Reservations manageView /></RoleRoute>} /><Route path="/combined-bookings" element={<CombinedBookingsRoute />} /><Route path="/reports" element={<RoleRoute roles={["Staff", "Admin"]}><Reports /></RoleRoute>} /><Route path="/users" element={<RoleRoute roles={["Admin"]}><Users /></RoleRoute>} /><Route path="/notifications" element={<Notifications />} /><Route path="/profile" element={<Profile />} /><Route path="*" element={<Navigate to="/home" replace />} /></Routes></AppLayout></Protected>} /></Routes>;
+    return <Routes><Route path="/login" element={<AuthPage />} /><Route path="/register" element={<AuthPage registerMode />} /><Route path="/forgot-password" element={<ForgotPassword />} /><Route path="/reset-password" element={<ResetPassword />} /><Route path="*" element={<Protected><AppLayout><Routes><Route path="/" element={<LandingRedirect />} /><Route path="/home" element={<Home />} /><Route path="/dashboard" element={<RoleRoute roles={["Staff", "Admin"]}><Dashboard /></RoleRoute>} /><Route path="/properties" element={<RoleRoute roles={["Staff", "Admin"]}><Properties /></RoleRoute>} /><Route path="/hotels" element={<HotelCatalogRoute />} /><Route path="/hotels/:hotelId" element={<PropertyDetailsRoute />} /><Route path="/restaurants" element={<RestaurantCatalogRoute />} /><Route path="/restaurants/:restaurantId" element={<RestaurantDetailsRoute />} /><Route path="/rooms" element={<RoleRoute roles={["Staff", "Admin"]}><ResourcePage kind="rooms" /></RoleRoute>} /><Route path="/tables" element={<RoleRoute roles={["Staff", "Admin"]}><ResourcePage kind="tables" /></RoleRoute>} /><Route path="/amenities" element={<RoleRoute roles={["Admin"]}><ManagerPlaceholder title="Amenities" description="Manage hotel amenities and their room and restaurant links." /></RoleRoute>} /><Route path="/reservations" element={<ReservationsRoute />} /><Route path="/manage" element={<RoleRoute roles={["Staff", "Admin"]}><Reservations manageView /></RoleRoute>} /><Route path="/combined-bookings" element={<CombinedBookingsRoute />} /><Route path="/reports" element={<RoleRoute roles={["Staff", "Admin"]}><Reports /></RoleRoute>} /><Route path="/users" element={<RoleRoute roles={["Admin"]}><Users /></RoleRoute>} /><Route path="/notifications" element={<Notifications />} /><Route path="/profile" element={<Profile />} /><Route path="*" element={<Navigate to="/home" replace />} /></Routes></AppLayout></Protected>} /></Routes>;
 }
