@@ -1,6 +1,6 @@
 import { supabase } from "../config/supabase.js";
 import {
-    isSupportedStatusTransition,
+    mapStatusHistoryRpcError,
     ReservationError,
     validateReservation,
     type ReservationInput
@@ -161,42 +161,31 @@ export const updateCombinedBooking = async (id: number, combinedBooking: { user_
 export const deleteCombinedBooking = async (id: number, changedBy: string) => changeCombinedBookingStatus(id, { status: "Cancelled", remarks: "Combined booking cancelled" }, changedBy);
 
 export const changeCombinedBookingStatus = async (id: number, payload: { status: string; remarks?: string }, changedBy: string) => {
-    const { data: current, error: currentError } = await supabase.from("combined_booking").select("status").eq("combined_booking_id", id).single();
-    if (currentError || !current) throw currentError ?? new ReservationError("Combined booking not found", 404);
-    if (!isSupportedStatusTransition(current.status, payload.status)) throw new ReservationError(`Invalid combined booking status transition: ${current.status} to ${payload.status}`);
+    const { data, error } = await supabase.rpc("change_combined_booking_status_with_history", {
+        p_combined_booking_id: id,
+        p_status: payload.status,
+        p_remarks: payload.remarks ?? null,
+        p_changed_by: changedBy
+    });
+    if (error) throw mapStatusHistoryRpcError(error, "Combined booking not found", "Invalid combined booking status transition");
 
-    const { data: children, error: childrenError } = await supabase.from("reservation").select("reservation_id, user_id, status").eq("combined_booking_id", id);
-    if (childrenError) throw childrenError;
-    for (const child of children ?? []) {
-        if (!isSupportedStatusTransition(child.status, payload.status)) throw new ReservationError(`Child reservation cannot transition from ${child.status} to ${payload.status}`);
-    }
-
-    const { data, error } = await supabase.from("combined_booking").update({ status: payload.status }).eq("combined_booking_id", id).select().single();
-    if (error) throw error;
-
-    if (children?.length) {
-        const childIds = children.map((child) => child.reservation_id);
-        const { error: childUpdateError } = await supabase.from("reservation").update({ status: payload.status, updated_at: new Date().toISOString() }).in("reservation_id", childIds);
-        if (childUpdateError) throw childUpdateError;
-        const { error: historyError } = await supabase.from("reservation_status_history").insert(children.map((child) => ({
-            reservation_id: child.reservation_id,
-            changed_by: changedBy,
-            status: payload.status,
-            remarks: payload.remarks ?? "Status changed through combined booking"
-        })));
-        if (historyError) throw historyError;
+    const result = data as {
+        combined_booking: Record<string, unknown>;
+        reservations: Array<{ reservation_id: number; user_id: string }>;
+    };
+    if (result.reservations.length) {
         const notificationType = {
             Confirmed: "RESERVATION_CONFIRMED",
             Rejected: "RESERVATION_REJECTED",
             Cancelled: "RESERVATION_CANCELLED",
             Completed: "RESERVATION_COMPLETED"
         } as const;
-        await Promise.all(children.map((child) => createReservationNotification({
+        await Promise.all(result.reservations.map((child) => createReservationNotification({
             userId: child.user_id,
             reservationId: child.reservation_id,
             type: notificationType[payload.status as keyof typeof notificationType]
         })));
     }
 
-    return data;
+    return result.combined_booking;
 };
