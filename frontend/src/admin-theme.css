@@ -3685,6 +3685,34 @@
   border-color: #d9ad48;
 }
 
+.admin-app .admin-crud-toolbar > label {
+  display: grid;
+  gap: 6px;
+  color: #b8c3d3;
+  font-size: 0.8rem;
+}
+
+.admin-app .admin-crud-toolbar > label select {
+  min-width: 220px;
+}
+
+.admin-app .admin-crud-role-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-app .admin-crud-role-control select {
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid #34435d;
+  border-radius: 7px;
+  background: #0b1428;
+  color: #e2e8f0;
+  color-scheme: dark;
+  font: inherit;
+}
+
 .admin-app .admin-crud-result-count {
   margin-left: auto;
   color: #b8c3d3;

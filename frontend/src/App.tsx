@@ -16,6 +16,8 @@ import { buildCombinedBookingPayload } from "./customerData";
 import { passwordErrors, passwordRequirements } from "./passwordPolicy";
 import { defaultStatusFor, statusOptionsFor, type CombinedBooking, type Hotel, type InventoryResourceKind, type Reservation, type ReservationHistory, type Restaurant, type RestaurantTable, type Room, type User } from "./types";
 import { AdminInventoryPage } from "./components/AdminInventoryPage";
+import { AdminAmenitiesPage } from "./components/AdminAmenitiesPage";
+import { AdminUsersPage } from "./components/AdminUsersPage";
 import { MediaManager } from "./components/MediaManager";
 
 const role = (user: User | null) => user?.role?.role_name ?? "Customer";
@@ -346,7 +348,7 @@ function Notifications() {
 }
 
 function Users() {
-    return <ManagerPlaceholder title="Users & Staff Assignments" description="Manage user roles and restaurant assignments." />;
+    return <AdminUsersPage />;
 }
 
 function ManagerPlaceholder({ title, description }: { title: string; description: string }) {
@@ -745,5 +747,5 @@ function Profile() {
 }
 
 export function App() {
-    return <Routes><Route path="/login" element={<AuthPage />} /><Route path="/register" element={<AuthPage registerMode />} /><Route path="/forgot-password" element={<ForgotPassword />} /><Route path="/reset-password" element={<ResetPassword />} /><Route path="*" element={<Protected><AppLayout><Routes><Route path="/" element={<LandingRedirect />} /><Route path="/home" element={<Home />} /><Route path="/dashboard" element={<RoleRoute roles={["Staff", "Admin"]}><Dashboard /></RoleRoute>} /><Route path="/properties" element={<RoleRoute roles={["Staff", "Admin"]}><Properties /></RoleRoute>} /><Route path="/hotels" element={<HotelCatalogRoute />} /><Route path="/hotels/:hotelId" element={<PropertyDetailsRoute />} /><Route path="/restaurants" element={<RestaurantCatalogRoute />} /><Route path="/restaurants/:restaurantId" element={<RestaurantDetailsRoute />} /><Route path="/rooms" element={<RoleRoute roles={["Staff", "Admin"]}><ManagerInventoryRoute kind="rooms" /></RoleRoute>} /><Route path="/tables" element={<RoleRoute roles={["Staff", "Admin"]}><ManagerInventoryRoute kind="tables" /></RoleRoute>} /><Route path="/amenities" element={<RoleRoute roles={["Admin"]}><ManagerPlaceholder title="Amenities" description="Manage hotel amenities and their room and restaurant links." /></RoleRoute>} /><Route path="/reservations" element={<ReservationsRoute />} /><Route path="/manage" element={<RoleRoute roles={["Staff", "Admin"]}><Reservations manageView /></RoleRoute>} /><Route path="/combined-bookings" element={<CombinedBookingsRoute />} /><Route path="/reports" element={<RoleRoute roles={["Staff", "Admin"]}><Reports /></RoleRoute>} /><Route path="/users" element={<RoleRoute roles={["Admin"]}><Users /></RoleRoute>} /><Route path="/notifications" element={<Notifications />} /><Route path="/profile" element={<Profile />} /><Route path="*" element={<Navigate to="/home" replace />} /></Routes></AppLayout></Protected>} /></Routes>;
+    return <Routes><Route path="/login" element={<AuthPage />} /><Route path="/register" element={<AuthPage registerMode />} /><Route path="/forgot-password" element={<ForgotPassword />} /><Route path="/reset-password" element={<ResetPassword />} /><Route path="*" element={<Protected><AppLayout><Routes><Route path="/" element={<LandingRedirect />} /><Route path="/home" element={<Home />} /><Route path="/dashboard" element={<RoleRoute roles={["Staff", "Admin"]}><Dashboard /></RoleRoute>} /><Route path="/properties" element={<RoleRoute roles={["Staff", "Admin"]}><Properties /></RoleRoute>} /><Route path="/hotels" element={<HotelCatalogRoute />} /><Route path="/hotels/:hotelId" element={<PropertyDetailsRoute />} /><Route path="/restaurants" element={<RestaurantCatalogRoute />} /><Route path="/restaurants/:restaurantId" element={<RestaurantDetailsRoute />} /><Route path="/rooms" element={<RoleRoute roles={["Staff", "Admin"]}><ManagerInventoryRoute kind="rooms" /></RoleRoute>} /><Route path="/tables" element={<RoleRoute roles={["Staff", "Admin"]}><ManagerInventoryRoute kind="tables" /></RoleRoute>} /><Route path="/amenities" element={<RoleRoute roles={["Admin"]}><AdminAmenitiesPage /></RoleRoute>} /><Route path="/reservations" element={<ReservationsRoute />} /><Route path="/manage" element={<RoleRoute roles={["Staff", "Admin"]}><Reservations manageView /></RoleRoute>} /><Route path="/combined-bookings" element={<CombinedBookingsRoute />} /><Route path="/reports" element={<RoleRoute roles={["Staff", "Admin"]}><Reports /></RoleRoute>} /><Route path="/users" element={<RoleRoute roles={["Admin"]}><Users /></RoleRoute>} /><Route path="/notifications" element={<Notifications />} /><Route path="/profile" element={<Profile />} /><Route path="*" element={<Navigate to="/home" replace />} /></Routes></AppLayout></Protected>} /></Routes>;
 }
