@@ -1821,7 +1821,10 @@
 .compact-hero { padding-top: 66px; padding-bottom: 58px; }
 .hero-links { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
 .customer-listing-section { margin: 36px 0 48px; }
-.customer-resource-card { overflow: hidden; color: inherit; }
+.customer-app .customer-resource-card { overflow: hidden; color: #172033; }
+.customer-app .customer-combined-bookings .combined-booking-card { color: #172033; }
+.customer-app .customer-resource-card .customer-card-description { color: #5f6b7a; }
+.customer-app .customer-resource-card .customer-resource-count { color: #5f6b7a; }
 .customer-card-visual {
   position: relative;
   display: grid;
