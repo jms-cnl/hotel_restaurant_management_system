@@ -33,6 +33,20 @@ export const isSupportedStatusTransition = (from: string, to: string) => {
         (from === "Confirmed" && (to === "Completed" || to === "Cancelled"));
 };
 
+export const mapStatusHistoryRpcError = (error: unknown, missingMessage: string, transitionMessage: string) => {
+    const code = error && typeof error === "object" && "code" in error && typeof error.code === "string"
+        ? error.code
+        : "";
+    if (code === "42501") return new ReservationError("Not authenticated", 401);
+    if (code === "P0001" && error && typeof error === "object" && "message" in error && typeof error.message === "string" && error.message.startsWith("FORBIDDEN:")) {
+        return new ReservationError("Forbidden", 403);
+    }
+    if (code === "P0002") return new ReservationError(missingMessage, 404);
+    if (code === "22023") return new ReservationError(transitionMessage, 400);
+    if (code === "23P01") return new ReservationError("This room or table is already booked for that time.", 409);
+    return error;
+};
+
 const isDate = (value: string) => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
     const parsed = new Date(`${value}T00:00:00Z`);
@@ -161,14 +175,13 @@ export const updateReservation = async (id: number, reservation: Partial<Reserva
 export const deleteReservation = async (id: number, changedBy: string) => changeReservationStatus(id, { status: "Cancelled", remarks: "Reservation cancelled" }, changedBy);
 
 export const changeReservationStatus = async (id: number, payload: { status: string; remarks?: string }, changedBy: string) => {
-    const { data: current, error: currentError } = await supabase.from("reservation").select("status").eq("reservation_id", id).single();
-    if (currentError || !current) throw currentError ?? new ReservationError("Reservation not found", 404);
-    if (!isSupportedStatusTransition(current.status, payload.status)) throw new ReservationError(`Invalid reservation status transition: ${current.status} to ${payload.status}`);
-
-    const { data, error } = await supabase.from("reservation").update({ status: payload.status, updated_at: new Date().toISOString() }).eq("reservation_id", id).select().single();
-    if (error) throw error;
-    const { error: historyError } = await supabase.from("reservation_status_history").insert({ reservation_id: id, changed_by: changedBy, status: payload.status, remarks: payload.remarks });
-    if (historyError) throw historyError;
+    const { data, error } = await supabase.rpc("change_reservation_status_with_history", {
+        p_reservation_id: id,
+        p_status: payload.status,
+        p_remarks: payload.remarks ?? null,
+        p_changed_by: changedBy
+    });
+    if (error) throw mapStatusHistoryRpcError(error, "Reservation not found", "Invalid reservation status transition");
     const notificationType = {
         Confirmed: "RESERVATION_CONFIRMED",
         Rejected: "RESERVATION_REJECTED",

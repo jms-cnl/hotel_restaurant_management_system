@@ -37,13 +37,15 @@ const invokeCustomerDelete = async (currentStatus) => {
         const url = new URL(String(input));
         const table = url.pathname.split("/").at(-1);
         const method = (init.method ?? "GET").toUpperCase();
-        calls.push({ table, method, url });
+        calls.push({ table, method, url, body: init.body ? JSON.parse(String(init.body)) : undefined });
 
-        if (table === "reservation" && method === "GET") {
-            if (url.searchParams.get("select") === "user_id") return jsonResponse({ user_id: "customer-1" });
-            if (url.searchParams.get("select") === "status") return jsonResponse({ status: currentStatus });
+        if (table === "reservation" && method === "GET" && url.searchParams.get("select") === "user_id") {
+            return jsonResponse({ user_id: "customer-1" });
         }
-        if (table === "reservation" && method === "PATCH") {
+        if (url.pathname.endsWith("/rpc/change_reservation_status_with_history") && method === "POST") {
+            if (["Rejected", "Completed"].includes(currentStatus)) {
+                return jsonResponse({ code: "22023", message: "Invalid reservation status transition", details: null, hint: null }, 400);
+            }
             return jsonResponse({ reservation_id: 12, user_id: "customer-1", status: "Cancelled" });
         }
         if (method === "POST") return new Response(null, { status: 201 });
@@ -76,12 +78,20 @@ const invokeCustomerDelete = async (currentStatus) => {
     return { response: res, calls };
 };
 
-test("customer owner can cancel a Pending reservation through DELETE /api/reservations/:id", async () => {
+test("customer owner cancels through the atomic status-history RPC", async () => {
     const { response, calls } = await invokeCustomerDelete("Pending");
 
     assert.equal(response.statusCode, 200, JSON.stringify({ response, calls: calls.map((call) => ({ table: call.table, method: call.method, url: call.url.toString() })) }));
     assert.equal(response.body.status, "Cancelled");
-    assert.ok(calls.some((call) => call.table === "reservation_status_history" && call.method === "POST"));
+    const statusRpcCalls = calls.filter((call) => call.url.pathname.endsWith("/rpc/change_reservation_status_with_history"));
+    assert.equal(statusRpcCalls.length, 1);
+    assert.deepEqual(statusRpcCalls[0].body, {
+        p_reservation_id: 12,
+        p_status: "Cancelled",
+        p_remarks: "Reservation cancelled",
+        p_changed_by: "customer-1",
+    });
+    assert.equal(calls.some((call) => call.table === "reservation_status_history"), false);
     assert.ok(calls.some((call) => call.table === "notification" && call.method === "POST"));
 });
 
@@ -90,6 +100,7 @@ for (const status of ["Rejected", "Completed"]) {
         const { response, calls } = await invokeCustomerDelete(status);
 
         assert.equal(response.statusCode, 400);
-        assert.equal(calls.some((call) => call.table === "reservation" && call.method === "PATCH"), false);
+        assert.equal(calls.some((call) => call.url.pathname.endsWith("/rpc/change_reservation_status_with_history")), true);
+        assert.equal(calls.some((call) => call.table === "reservation_status_history"), false);
     });
 }
