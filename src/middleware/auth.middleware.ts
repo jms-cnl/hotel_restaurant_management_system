@@ -137,7 +137,7 @@ export const createAuthenticationMiddleware = (
 
         try {
             if (cookie.present) {
-                resolved = await dependencies.resolveSession(cookie.value!, now, { allowRecovery: options.allowRecovery ?? false });
+                resolved = await dependencies.resolveSession(cookie.value!, now, { allowRecovery: true });
                 if (!resolved) {
                     handleInvalidCookie(req, res, next, "Invalid or expired session");
                     return;
@@ -174,6 +174,11 @@ export const createAuthenticationMiddleware = (
             const isRecoverySession = resolved?.session.purpose === "recovery"
                 || (!resolved && authMethod === "legacy_bearer" && hasRecoveryAmr(accessToken));
             if (isRecoverySession && !options.allowRecovery) {
+                if (invalidCookieBehavior === "anonymous" && resolved?.session.purpose === "recovery") {
+                    delete req.auth;
+                    dependencies.runWithRequest(req, () => next());
+                    return;
+                }
                 res.status(403).json({ message: "Recovery sessions cannot access application routes" });
                 return;
             }
