@@ -3,6 +3,7 @@ export type HotelReservationPayload = {
     room_id: number;
     check_in_date: string;
     check_out_date: string;
+    special_request?: string | null;
 };
 
 export type RestaurantReservationPayload = {
@@ -11,6 +12,7 @@ export type RestaurantReservationPayload = {
     reservation_date: string;
     start_time: string;
     end_time: string;
+    special_request?: string | null;
 };
 
 export type CombinedBookingPayload = {
@@ -36,10 +38,20 @@ type TableResource = { restaurant_id: number; status: string };
 
 const normalized = (value: string | null | undefined) => value?.trim().toLocaleLowerCase() ?? "";
 
-const placeFromAddress = (address: string | null | undefined) => address?.split(",")[0]?.trim() ?? "";
+export const getAddressCity = (address: string | null | undefined) => {
+    const segments = address?.split(",").map((segment) => segment.trim()).filter(Boolean) ?? [];
+    return segments.length < 2 ? "" : segments[segments.length - 2];
+};
 
-export const getAddressLocations = (resources: readonly { address?: string | null }[]) =>
-    [...new Set(resources.map((resource) => placeFromAddress(resource.address)).filter(Boolean))];
+export const getAddressLocations = (resources: readonly { address?: string | null }[]) => {
+    const byNormalizedCity = new Map<string, string>();
+    resources.forEach((resource) => {
+        const city = getAddressCity(resource.address);
+        const key = normalized(city);
+        if (key && !byNormalizedCity.has(key)) byNormalizedCity.set(key, city);
+    });
+    return [...byNormalizedCity.values()];
+};
 
 export const getBudgetTier = (rate: number): BudgetTier => {
     if (rate <= BUDGET_TIERS[0].max) return "budget-friendly";
@@ -50,7 +62,7 @@ export const getBudgetTier = (rate: number): BudgetTier => {
 const matchesCommonFilters = (resource: AddressableResource, filters: ListingFilters) => {
     const query = normalized(filters.search);
     const location = normalized(filters.location);
-    const resourceLocation = normalized(placeFromAddress(resource.address));
+    const resourceLocation = normalized(getAddressCity(resource.address));
     const matchesSearch = !query || `${resource.name} ${resource.address ?? ""}`.toLocaleLowerCase().includes(query);
     const matchesLocation = !location || location === "all" || resourceLocation === location;
     return matchesSearch && matchesLocation;
@@ -121,28 +133,72 @@ export const filterReservations = <T extends { reservation_type: string; status:
 export const isVenueBookable = (status: string | null | undefined): boolean =>
     status?.trim().toLocaleLowerCase() === "active";
 
+export const canCancelReservation = (reservation: { status: string; combined_booking_id?: number | null }) =>
+    reservation.combined_booking_id == null &&
+    ["pending", "confirmed"].includes(normalized(reservation.status));
+
+export const canCancelCombinedBooking = (status: string) =>
+    ["pending", "confirmed"].includes(normalized(status));
+
+export const isUpcomingBooking = (status: string, startDate: string | null | undefined, today: string) =>
+    ["pending", "confirmed"].includes(normalized(status)) && Boolean(startDate) && startDate! > today;
+
+export const claimRoomMediaRefresh = (roomId: number, attemptedRoomIds: Set<number>) => {
+    if (attemptedRoomIds.has(roomId)) return false;
+    attemptedRoomIds.add(roomId);
+    return true;
+};
+
+export const refreshRoomMediaOnce = async <T>(
+    roomId: number,
+    attemptedRoomIds: Set<number>,
+    fetchMedia: (roomId: number) => Promise<T[]>,
+): Promise<T[]> => {
+    if (!claimRoomMediaRefresh(roomId, attemptedRoomIds)) return [];
+    try { return await fetchMedia(roomId); }
+    catch { return []; }
+};
+
+export const mergeRoomMedia = <T>(current: Record<number, T[]>, roomId: number, media: T[]) => ({
+    ...current,
+    [roomId]: media,
+});
+
+export const combinedVenueLabel = (name: string | undefined, lookupFailed: boolean, fallback: string) =>
+    name ?? (lookupFailed ? "Venue details unavailable" : fallback);
+
+export const collectionState = (error: string, count: number): "unavailable" | "populated" | "empty" =>
+    error ? "unavailable" : count > 0 ? "populated" : "empty";
+
+export const countWhenAvailable = (count: number, ...sourcesUnavailable: boolean[]): number | null =>
+    sourcesUnavailable.some(Boolean) ? null : count;
+
 export const buildHotelReservationPayload = (
     roomId: number,
     checkIn: string,
-    checkOut: string
+    checkOut: string,
+    specialRequest?: string
 ): HotelReservationPayload => ({
     reservation_type: "HOTEL",
     room_id: roomId,
     check_in_date: checkIn,
     check_out_date: checkOut,
+    ...(specialRequest !== undefined ? { special_request: specialRequest.trim() || null } : {}),
 });
 
 export const buildRestaurantReservationPayload = (
     tableId: number,
     date: string,
     startTime: string,
-    endTime: string
+    endTime: string,
+    specialRequest?: string
 ): RestaurantReservationPayload => ({
     reservation_type: "RESTAURANT",
     table_id: tableId,
     reservation_date: date,
     start_time: startTime,
     end_time: endTime,
+    ...(specialRequest !== undefined ? { special_request: specialRequest.trim() || null } : {}),
 });
 
 export const buildCombinedBookingPayload = (input: {
