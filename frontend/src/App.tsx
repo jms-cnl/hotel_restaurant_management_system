@@ -207,7 +207,8 @@ function StaffDashboard() {
 }
 
 function Home() {
-    return <CustomerHome />;
+    const { user } = useAuth();
+    return isManager(user) ? <Navigate to="/dashboard" replace /> : <CustomerHome />;
 }
 
 function Properties() {
