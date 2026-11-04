@@ -69,7 +69,8 @@ const uploadStorageFile = async (path: string, file: MediaFile) => {
 const withSignedUrl = async (media: Record<string, unknown>) => {
     const { data, error } = await supabase.storage.from(String(media.storage_bucket)).createSignedUrl(String(media.storage_path), 3600);
     if (error || !data?.signedUrl) throw error ?? new Error("Unable to create media URL");
-    return { ...media, url: data.signedUrl };
+    const { storage_bucket: _storageBucket, storage_path: _storagePath, ...publicMedia } = media;
+    return { ...publicMedia, url: data.signedUrl };
 };
 
 export const getMedia = async (type: string, id: number) => {
