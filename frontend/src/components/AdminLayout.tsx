@@ -27,6 +27,7 @@ export function AdminLayout({ children, warning }: { children: ReactNode; warnin
 
                 <nav className="customer-nav-links admin-nav-links" aria-label="Admin navigation">
                     <NavLink to="/dashboard">Dashboard</NavLink>
+                    <NavLink to="/manage">Manage</NavLink>
                     <NavLink to="/reservations">Reservations</NavLink>
                     <NavLink to="/combined-bookings">Combined Bookings</NavLink>
                     <NavLink to="/hotels">Hotels</NavLink>
