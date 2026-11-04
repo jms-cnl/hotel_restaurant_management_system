@@ -119,6 +119,9 @@ export const createReservation = async (reservation: ReservationInput, changedBy
     const normalized = { ...reservation, reservation_type: reservation.reservation_type.toUpperCase(), status: "Pending" };
     await validateReservation(normalized);
     const { data, error } = await supabase.from("reservation").insert(normalized).select().single();
+    if (error?.code === "23P01") {
+        throw new ReservationError("This room or table is already booked for that time.", 409);
+    }
     if (error) throw error;
 
     const { error: historyError } = await supabase.from("reservation_status_history").insert({

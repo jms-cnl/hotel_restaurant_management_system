@@ -111,6 +111,7 @@ export const createCombinedBooking = async (payload: {
         p_reservations: reservations
     });
     if (error) {
+        if (error.code === "23P01") throw new ReservationError("This room or table is already booked for that time.", 409);
         if (error.code === "22023") throw new ReservationError(error.message, 400);
         if (error.code === "42501") throw new ReservationError(error.message, 403);
         throw error;
