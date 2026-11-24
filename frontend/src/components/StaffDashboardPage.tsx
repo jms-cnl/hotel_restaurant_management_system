@@ -88,7 +88,9 @@ export function StaffDashboardPage({ user }: { user: User | null }) {
                     const counts = card.getStatusCounts();
                     return <article className="staff-dashboard-stat" key={card.resourceName}>
                         <h3>{card.resourceName}</h3>
-                        {Object.entries(counts).map(([status, count]) => <p key={status}>{status}: <strong>{count}</strong></p>)}
+                        <div className="staff-inventory-status-counts">
+                            {Object.entries(counts).map(([status, count]) => <p key={status}><span>{status}</span><strong>{count}</strong></p>)}
+                        </div>
                     </article>;
                 })}
             </div>

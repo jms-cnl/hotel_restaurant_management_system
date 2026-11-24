@@ -55,6 +55,12 @@ button:hover { background: #e5e7eb; }
   margin-bottom: 24px;
 }
 
+.manager-app .staff-inventory-status-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
 .manager-app .staff-dashboard-stat {
   position: relative;
   min-height: 100px;
@@ -62,6 +68,36 @@ button:hover { background: #e5e7eb; }
   border: 1px solid #344158;
   border-radius: 12px;
   background: #1e2d3d;
+}
+
+.manager-app .staff-inventory-status-cards h3 {
+  margin: 0 0 14px;
+  color: #f8f7f4;
+  font-size: 0.95rem;
+}
+
+.manager-app .staff-inventory-status-counts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.manager-app .staff-dashboard-stat .staff-inventory-status-counts p {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  margin: 0;
+  padding: 9px 8px;
+  border-radius: 8px;
+  background: #26374a;
+  color: #a9b7c8;
+  font-size: 0.68rem;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
+.manager-app .staff-dashboard-stat .staff-inventory-status-counts strong {
+  font-size: 1.1rem;
 }
 
 .manager-app .staff-dashboard-stat p {
@@ -210,6 +246,14 @@ button:hover { background: #e5e7eb; }
 }
 
 @media (max-width: 700px) {
+  .manager-app .staff-inventory-status-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .manager-app .staff-inventory-status-counts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .manager-app .staff-dashboard-stats {
     grid-template-columns: 1fr;
   }
