@@ -225,17 +225,33 @@ function ManagerInventoryRoute({ kind }: { kind: "rooms" | "tables" }) {
 
 function ReservationsRoute() {
     const { user } = useAuth();
-    return isManager(user) ? <Reservations /> : <CustomerReservations />;
+    return isAdmin(user) ? <AdminBookingsWorkspace initialSection="reservations" /> : isManager(user) ? <Reservations /> : <CustomerReservations />;
 }
 
 function CombinedBookingsRoute() {
     const { user } = useAuth();
-    return isManager(user) ? <CombinedBookings /> : <CustomerCombinedBookings />;
+    return isAdmin(user) ? <AdminBookingsWorkspace initialSection="combinedBookings" /> : isManager(user) ? <CombinedBookings /> : <CustomerCombinedBookings />;
 }
 
 function ManageRoute() {
     const { user } = useAuth();
-    return isAdmin(user) ? <AdminManage /> : <Reservations manageView />;
+    return isAdmin(user) ? <AdminBookingsWorkspace initialSection="manage" /> : <Reservations manageView />;
+}
+
+type AdminBookingSection = "manage" | "reservations" | "combinedBookings";
+
+function AdminBookingsWorkspace({ initialSection = "manage" }: { initialSection?: AdminBookingSection }) {
+    const [activeSection, setActiveSection] = useState<AdminBookingSection>(initialSection);
+    useEffect(() => setActiveSection(initialSection), [initialSection]);
+
+    return <section className="admin-bookings-workspace">
+        <nav className="admin-crud-tabs" role="tablist" aria-label="Bookings workspace sections">
+            <button type="button" role="tab" aria-selected={activeSection === "manage"} className={activeSection === "manage" ? "active" : ""} onClick={() => setActiveSection("manage")}>Manage</button>
+            <button type="button" role="tab" aria-selected={activeSection === "reservations"} className={activeSection === "reservations" ? "active" : ""} onClick={() => setActiveSection("reservations")}>Reservations</button>
+            <button type="button" role="tab" aria-selected={activeSection === "combinedBookings"} className={activeSection === "combinedBookings" ? "active" : ""} onClick={() => setActiveSection("combinedBookings")}>Combined Bookings</button>
+        </nav>
+        {activeSection === "manage" ? <AdminManage /> : activeSection === "reservations" ? <Reservations /> : <CombinedBookings />}
+    </section>;
 }
 
 function Notifications() {
@@ -670,5 +686,5 @@ function Profile() {
 }
 
 export function App() {
-    return <Routes><Route path="/login" element={<AuthPage />} /><Route path="/register" element={<AuthPage registerMode />} /><Route path="/forgot-password" element={<ForgotPassword />} /><Route path="/reset-password" element={<ResetPassword />} /><Route path="*" element={<Protected><AppLayout><Routes><Route path="/" element={<LandingRedirect />} /><Route path="/home" element={<Home />} /><Route path="/dashboard" element={<RoleRoute roles={["Staff", "Admin"]}><Dashboard /></RoleRoute>} /><Route path="/properties" element={<StaffPropertyRedirect><RoleRoute roles={["Staff", "Admin"]}><Properties /></RoleRoute></StaffPropertyRedirect>} /><Route path="/hotels" element={<StaffPropertyRedirect><HotelCatalogRoute /></StaffPropertyRedirect>} /><Route path="/hotels/:hotelId" element={<StaffPropertyRedirect><PropertyDetailsRoute /></StaffPropertyRedirect>} /><Route path="/restaurants" element={<StaffPropertyRedirect><RestaurantCatalogRoute /></StaffPropertyRedirect>} /><Route path="/restaurants/:restaurantId" element={<StaffPropertyRedirect><RestaurantDetailsRoute /></StaffPropertyRedirect>} /><Route path="/rooms" element={<RoleRoute roles={["Staff", "Admin"]}><ManagerInventoryRoute kind="rooms" /></RoleRoute>} /><Route path="/tables" element={<RoleRoute roles={["Staff", "Admin"]}><ManagerInventoryRoute kind="tables" /></RoleRoute>} /><Route path="/amenities" element={<RoleRoute roles={["Admin"]}><AdminAmenitiesPage /></RoleRoute>} /><Route path="/reservations" element={<ReservationsRoute />} /><Route path="/manage" element={<RoleRoute roles={["Staff", "Admin"]}><ManageRoute /></RoleRoute>} /><Route path="/combined-bookings" element={<CombinedBookingsRoute />} /><Route path="/reports" element={<RoleRoute roles={["Staff", "Admin"]}><Reports /></RoleRoute>} /><Route path="/users" element={<RoleRoute roles={["Admin"]}><Users /></RoleRoute>} /><Route path="/notifications" element={<Notifications />} /><Route path="/profile" element={<Profile />} /><Route path="*" element={<Navigate to="/home" replace />} /></Routes></AppLayout></Protected>} /></Routes>;
+    return <Routes><Route path="/login" element={<AuthPage />} /><Route path="/register" element={<AuthPage registerMode />} /><Route path="/forgot-password" element={<ForgotPassword />} /><Route path="/reset-password" element={<ResetPassword />} /><Route path="*" element={<Protected><AppLayout><Routes><Route path="/" element={<LandingRedirect />} /><Route path="/home" element={<Home />} /><Route path="/dashboard" element={<RoleRoute roles={["Staff", "Admin"]}><Dashboard /></RoleRoute>} /><Route path="/properties" element={<StaffPropertyRedirect><RoleRoute roles={["Staff", "Admin"]}><Properties /></RoleRoute></StaffPropertyRedirect>} /><Route path="/hotels" element={<StaffPropertyRedirect><HotelCatalogRoute /></StaffPropertyRedirect>} /><Route path="/hotels/:hotelId" element={<StaffPropertyRedirect><PropertyDetailsRoute /></StaffPropertyRedirect>} /><Route path="/restaurants" element={<StaffPropertyRedirect><RestaurantCatalogRoute /></StaffPropertyRedirect>} /><Route path="/restaurants/:restaurantId" element={<StaffPropertyRedirect><RestaurantDetailsRoute /></StaffPropertyRedirect>} /><Route path="/rooms" element={<RoleRoute roles={["Staff", "Admin"]}><ManagerInventoryRoute kind="rooms" /></RoleRoute>} /><Route path="/tables" element={<RoleRoute roles={["Staff", "Admin"]}><ManagerInventoryRoute kind="tables" /></RoleRoute>} /><Route path="/amenities" element={<RoleRoute roles={["Admin"]}><AdminAmenitiesPage /></RoleRoute>} /><Route path="/bookings" element={<RoleRoute roles={["Admin"]}><AdminBookingsWorkspace /></RoleRoute>} /><Route path="/reservations" element={<ReservationsRoute />} /><Route path="/manage" element={<RoleRoute roles={["Staff", "Admin"]}><ManageRoute /></RoleRoute>} /><Route path="/combined-bookings" element={<CombinedBookingsRoute />} /><Route path="/reports" element={<RoleRoute roles={["Staff", "Admin"]}><Reports /></RoleRoute>} /><Route path="/users" element={<RoleRoute roles={["Admin"]}><Users /></RoleRoute>} /><Route path="/notifications" element={<Notifications />} /><Route path="/profile" element={<Profile />} /><Route path="*" element={<Navigate to="/home" replace />} /></Routes></AppLayout></Protected>} /></Routes>;
 }

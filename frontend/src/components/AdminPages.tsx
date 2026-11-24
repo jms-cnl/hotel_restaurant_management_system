@@ -120,19 +120,6 @@ export function AdminDashboard() {
                 <small>{card.note}</small>
             </article>)}
         </div>
-        <div className="admin-panel">
-            <h2>Recent Operations</h2>
-            <div className="admin-table-wrap">
-                <table className="admin-table">
-                    <thead><tr><th>Activity</th><th>Date &amp; Time</th><th>Status</th></tr></thead>
-                    <tbody><tr><td colSpan={3}><div className="admin-empty">
-                        <span aria-hidden="true">—</span>
-                        <strong>No recent operations available.</strong>
-                        <p>The backend does not provide an operations activity feed.</p>
-                    </div></td></tr></tbody>
-                </table>
-            </div>
-        </div>
     </section>;
 }
 
