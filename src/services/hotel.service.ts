@@ -1,6 +1,5 @@
 import { supabase } from "../config/supabase.js";
 import { canonicalizeStatus, HOTEL_STATUSES } from "../constants/status.js";
-import { deleteMediaForEntity } from "./media.service.js";
 
 export class HotelError extends Error {
     constructor(message: string, public readonly statusCode = 400) {
@@ -41,31 +40,6 @@ export const getHotelById = async (id: number) => {
     return data;
 };
 
-export const createHotel = async (hotel: {
-    name: string;
-    address: string;
-    description?: string;
-    contact_number: string;
-    email?: string;
-    status?: unknown;
-}) => {
-    const normalizedHotel = {
-        ...hotel,
-        status: canonicalizeStatus(hotel.status, "hotel", HOTEL_STATUSES, "Active")
-    };
-    const { data, error } = await supabase
-        .from("hotel")
-        .insert(normalizedHotel)
-        .select()
-        .single();
-
-    if (error) {
-        throw error;
-    }
-
-    return data;
-};
-
 export const updateHotel = async (
     id: number,
     hotel: {
@@ -96,17 +70,5 @@ export const updateHotel = async (
     }
 
     return data;
-};
-
-export const deleteHotel = async (id: number) => {
-    await deleteMediaForEntity("hotel", id);
-    const { error } = await supabase
-        .from("hotel")
-        .delete()
-        .eq("hotel_id", id);
-
-    if (error) {
-        throw error;
-    }
 };
 

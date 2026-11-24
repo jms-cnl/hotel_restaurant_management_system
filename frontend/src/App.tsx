@@ -16,6 +16,7 @@ import { buildCombinedBookingPayload } from "./customerData";
 import { passwordErrors, passwordRequirements } from "./passwordPolicy";
 import { defaultStatusFor, statusOptionsFor, type CombinedBooking, type Hotel, type InventoryResourceKind, type Reservation, type ReservationHistory, type Restaurant, type RestaurantTable, type Room, type User } from "./types";
 import { AdminInventoryPage } from "./components/AdminInventoryPage";
+import { AdminPropertySettingsPage } from "./components/AdminPropertySettingsPage";
 import { AdminAmenitiesPage } from "./components/AdminAmenitiesPage";
 import { AdminUsersPage } from "./components/AdminUsersPage";
 import { MediaManager } from "./components/MediaManager";
@@ -209,7 +210,7 @@ function StaffPropertyDetails({ restaurantMode = false }: { restaurantMode?: boo
 
 function HotelCatalogRoute() {
     const { user } = useAuth();
-    return isAdmin(user) ? <AdminInventoryPage kind="hotels" /> : isManager(user) ? <ResourcePage kind="hotels" /> : <HotelDiscovery />;
+    return isAdmin(user) ? <AdminPropertySettingsPage /> : isManager(user) ? <ResourcePage kind="hotels" /> : <HotelDiscovery />;
 }
 
 function RestaurantCatalogRoute() {

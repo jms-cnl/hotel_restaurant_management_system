@@ -3,9 +3,7 @@ import { InvalidStatusError } from "../constants/status.js";
 import { 
     getHotels, 
     getHotelById,
-    createHotel,
     updateHotel,
-    deleteHotel,
     HotelError,
 } from "../services/hotel.service.js";
 
@@ -36,25 +34,6 @@ export const getHotelByIdController = async (req: Request, res: Response) => {
     }
 };
 
-export const createHotelController = async (req: Request, res: Response) => {
-    try {
-        const hotel = await createHotel(req.body);
-
-        res.status(201).json(hotel);
-    } catch (error) {
-    if (error instanceof InvalidStatusError) {
-        res.status(error.statusCode).json({ message: error.message });
-        return;
-    }
-    console.error(error);
-
-    res.status(500).json({
-        message: "Failed to create hotel",
-        error: error
-    });
-}
-};
-
 export const updateHotelController = async (req: Request, res: Response) => {
     try {
         const id = Number(req.params.id);
@@ -76,23 +55,6 @@ export const updateHotelController = async (req: Request, res: Response) => {
 
         res.status(500).json({
             message: "Failed to update hotel",
-            error: error
-        });
-    }
-};
-
-export const deleteHotelController = async (req: Request, res: Response) => {
-    try {
-        const id = Number(req.params.id);
-
-        await deleteHotel(id);
-
-        res.status(204).send();
-    } catch (error) {
-        console.error(error);
-
-        res.status(500).json({
-            message: "Failed to delete hotel",
             error: error
         });
     }

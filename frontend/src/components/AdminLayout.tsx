@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
+import { adminTabs } from "../adminTabs";
 import "../admin-theme.css";
 
 const role = (user: ReturnType<typeof useAuth>["user"]) => user?.role?.role_name ?? "Staff";
@@ -26,18 +27,7 @@ export function AdminLayout({ children, warning }: { children: ReactNode; warnin
                 </Link>
 
                 <nav className="customer-nav-links admin-nav-links" aria-label="Admin navigation">
-                    <NavLink to="/dashboard">Dashboard</NavLink>
-                    <NavLink to="/manage">Manage</NavLink>
-                    <NavLink to="/reservations">Reservations</NavLink>
-                    <NavLink to="/combined-bookings">Combined Bookings</NavLink>
-                    <NavLink to="/hotels">Hotels</NavLink>
-                    <NavLink to="/restaurants">Restaurants</NavLink>
-                    <NavLink to="/rooms">Rooms</NavLink>
-                    <NavLink to="/tables">Tables</NavLink>
-                    <NavLink to="/amenities">Amenities</NavLink>
-                    <NavLink to="/users">Users &amp; Staff Assignments</NavLink>
-                    <NavLink to="/reports">Reports</NavLink>
-                    <NavLink to="/notifications" aria-label="Notifications">🔔</NavLink>
+                    {adminTabs.map(tab => tab.render())}
                 </nav>
 
                 <div className="customer-nav-actions">
