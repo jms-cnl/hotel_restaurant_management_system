@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { Link, Navigate, NavLink, Route, Routes, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut, reportMeaningfulActivity } from "./api";
 import { authSession } from "./auth-session";
 import { useAuth } from "./auth";
@@ -21,6 +21,8 @@ import { AdminUsersPage } from "./components/AdminUsersPage";
 import { MediaManager } from "./components/MediaManager";
 import { AdminDashboard, AdminNotifications } from "./components/AdminPages";
 import { AdminManage } from "./components/AdminManage";
+import { StaffLayout } from "./components/StaffLayout";
+import { staffRedirectForPath } from "./staffNavigation";
 
 const role = (user: User | null) => user?.role?.role_name ?? "Customer";
 const isManager = (user: User | null) => ["Admin", "Staff"].includes(role(user));
@@ -41,37 +43,18 @@ function RoleRoute({ roles, children }: { roles: string[]; children: ReactNode }
 }
 
 function AppLayout({ children }: { children: ReactNode }) {
-    const { user, logout, sessionWarning } = useAuth();
-    const navigate = useNavigate();
+    const { user, sessionWarning } = useAuth();
     const warning = sessionWarning && <div className="alert error" role="status">Your session will expire in two minutes due to inactivity. Save your work.</div>;
     if (!isManager(user)) return <CustomerLayout>{warning}{children}</CustomerLayout>;
     if (isAdmin(user)) return <AdminLayout warning={warning}>{children}</AdminLayout>;
-    const staffName = userName(user);
-    return <div className="manager-app customer-app">
-        <header className="customer-navbar">
-            <Link to="/dashboard" className="customer-logo">
-                <span className="customer-logo-icon">L</span>
-                <span>StayEase</span>
-            </Link>
-            <nav className="customer-nav-links">
-                <NavLink to="/dashboard">Dashboard</NavLink>
-                <NavLink to="/properties">Hotels &amp; Restaurants</NavLink>
-                <NavLink to="/reservations">Reservations</NavLink>
-                <NavLink to="/manage">Manage</NavLink>
-            </nav>
-            <div className="customer-nav-actions">
-                <NavLink to="/profile" className="customer-profile-link">
-                    {staffName}<span className="staff-role-label">{role(user)}</span>
-                </NavLink>
-                <NavLink to="/notifications" className="customer-profile-link">Notifications</NavLink>
-                <NavLink to="/profile" className="customer-profile-link">My Profile</NavLink>
-                <button type="button" className="customer-signout-button" onClick={async () => { await logout(); navigate("/login"); }}>
-                    Sign Out
-                </button>
-            </div>
-        </header>
-        <main className="customer-main">{warning}{children}</main>
-    </div>;
+    return <StaffLayout warning={warning}>{children}</StaffLayout>;
+}
+
+function StaffPropertyRedirect({ children }: { children: ReactNode }) {
+    const { user } = useAuth();
+    const location = useLocation();
+    const redirectTo = role(user) === "Staff" ? staffRedirectForPath(location.pathname) : null;
+    return redirectTo ? <Navigate to={redirectTo} replace /> : <>{children}</>;
 }
 
 function Page({ title, children, error, loading }: { title: string; children: ReactNode; error?: string; loading?: boolean }) {
@@ -771,5 +754,5 @@ function Profile() {
 }
 
 export function App() {
-    return <Routes><Route path="/login" element={<AuthPage />} /><Route path="/register" element={<AuthPage registerMode />} /><Route path="/forgot-password" element={<ForgotPassword />} /><Route path="/reset-password" element={<ResetPassword />} /><Route path="*" element={<Protected><AppLayout><Routes><Route path="/" element={<LandingRedirect />} /><Route path="/home" element={<Home />} /><Route path="/dashboard" element={<RoleRoute roles={["Staff", "Admin"]}><Dashboard /></RoleRoute>} /><Route path="/properties" element={<RoleRoute roles={["Staff", "Admin"]}><Properties /></RoleRoute>} /><Route path="/hotels" element={<HotelCatalogRoute />} /><Route path="/hotels/:hotelId" element={<PropertyDetailsRoute />} /><Route path="/restaurants" element={<RestaurantCatalogRoute />} /><Route path="/restaurants/:restaurantId" element={<RestaurantDetailsRoute />} /><Route path="/rooms" element={<RoleRoute roles={["Staff", "Admin"]}><ManagerInventoryRoute kind="rooms" /></RoleRoute>} /><Route path="/tables" element={<RoleRoute roles={["Staff", "Admin"]}><ManagerInventoryRoute kind="tables" /></RoleRoute>} /><Route path="/amenities" element={<RoleRoute roles={["Admin"]}><AdminAmenitiesPage /></RoleRoute>} /><Route path="/reservations" element={<ReservationsRoute />} /><Route path="/manage" element={<RoleRoute roles={["Staff", "Admin"]}><ManageRoute /></RoleRoute>} /><Route path="/combined-bookings" element={<CombinedBookingsRoute />} /><Route path="/reports" element={<RoleRoute roles={["Staff", "Admin"]}><Reports /></RoleRoute>} /><Route path="/users" element={<RoleRoute roles={["Admin"]}><Users /></RoleRoute>} /><Route path="/notifications" element={<Notifications />} /><Route path="/profile" element={<Profile />} /><Route path="*" element={<Navigate to="/home" replace />} /></Routes></AppLayout></Protected>} /></Routes>;
+    return <Routes><Route path="/login" element={<AuthPage />} /><Route path="/register" element={<AuthPage registerMode />} /><Route path="/forgot-password" element={<ForgotPassword />} /><Route path="/reset-password" element={<ResetPassword />} /><Route path="*" element={<Protected><AppLayout><Routes><Route path="/" element={<LandingRedirect />} /><Route path="/home" element={<Home />} /><Route path="/dashboard" element={<RoleRoute roles={["Staff", "Admin"]}><Dashboard /></RoleRoute>} /><Route path="/properties" element={<StaffPropertyRedirect><RoleRoute roles={["Staff", "Admin"]}><Properties /></RoleRoute></StaffPropertyRedirect>} /><Route path="/hotels" element={<StaffPropertyRedirect><HotelCatalogRoute /></StaffPropertyRedirect>} /><Route path="/hotels/:hotelId" element={<StaffPropertyRedirect><PropertyDetailsRoute /></StaffPropertyRedirect>} /><Route path="/restaurants" element={<StaffPropertyRedirect><RestaurantCatalogRoute /></StaffPropertyRedirect>} /><Route path="/restaurants/:restaurantId" element={<StaffPropertyRedirect><RestaurantDetailsRoute /></StaffPropertyRedirect>} /><Route path="/rooms" element={<RoleRoute roles={["Staff", "Admin"]}><ManagerInventoryRoute kind="rooms" /></RoleRoute>} /><Route path="/tables" element={<RoleRoute roles={["Staff", "Admin"]}><ManagerInventoryRoute kind="tables" /></RoleRoute>} /><Route path="/amenities" element={<RoleRoute roles={["Admin"]}><AdminAmenitiesPage /></RoleRoute>} /><Route path="/reservations" element={<ReservationsRoute />} /><Route path="/manage" element={<RoleRoute roles={["Staff", "Admin"]}><ManageRoute /></RoleRoute>} /><Route path="/combined-bookings" element={<CombinedBookingsRoute />} /><Route path="/reports" element={<RoleRoute roles={["Staff", "Admin"]}><Reports /></RoleRoute>} /><Route path="/users" element={<RoleRoute roles={["Admin"]}><Users /></RoleRoute>} /><Route path="/notifications" element={<Notifications />} /><Route path="/profile" element={<Profile />} /><Route path="*" element={<Navigate to="/home" replace />} /></Routes></AppLayout></Protected>} /></Routes>;
 }

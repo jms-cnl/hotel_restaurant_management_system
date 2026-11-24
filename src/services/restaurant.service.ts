@@ -1,5 +1,7 @@
-import { supabase } from "../config/supabase.js";
+import type { Request } from "express";
+import { getRequestSupabase, supabase } from "../config/supabase.js";
 import { canonicalizeStatus, RESTAURANT_STATUSES } from "../constants/status.js";
+import { getAssignedRestaurantIds } from "../middleware/restaurant-access.middleware.js";
 import { deleteMediaForEntity } from "./media.service.js";
 
 export class RestaurantError extends Error {
@@ -9,10 +11,17 @@ export class RestaurantError extends Error {
     }
 }
 
-export const getRestaurants = async (filters: { search?: string | undefined }) => {
-    let query = supabase
+export const getRestaurants = async (filters: { search?: string | undefined }, req?: Request) => {
+    const isStaff = req?.auth?.roleName.toLowerCase() === "staff";
+    const assignedRestaurantIds = isStaff ? await getAssignedRestaurantIds(req!) : undefined;
+    if (assignedRestaurantIds?.length === 0) return [];
+
+    const client = isStaff ? getRequestSupabase(req!) : supabase;
+    let query = client
         .from("restaurant")
         .select("*");
+
+    if (assignedRestaurantIds) query = query.in("restaurant_id", assignedRestaurantIds);
 
     if (filters.search) {
         query = query.or(`name.ilike.%${filters.search}%,address.ilike.%${filters.search}%`);
