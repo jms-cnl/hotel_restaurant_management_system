@@ -369,6 +369,9 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; }
   flex-wrap: nowrap;
   white-space: nowrap;
 }
+.manager-app .customer-logo {
+  text-decoration: none;
+}
 .manager-app .customer-nav-links a,
 .manager-app .customer-nav-actions a {
   text-decoration: none;

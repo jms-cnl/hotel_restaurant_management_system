@@ -13,7 +13,7 @@ export const getRestaurantsController = async (req: Request, res: Response) => {
     try {
         const restaurants = await getRestaurants({
             search: req.query.search?.toString()
-        });
+        }, req);
 
         res.json(restaurants);
     } catch (error) {
