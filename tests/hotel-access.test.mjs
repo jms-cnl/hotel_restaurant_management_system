@@ -32,23 +32,21 @@ const request = (roleName, params = {}) => ({
     auth: { roleName, accessToken: "verified-user-token" },
 });
 
-for (const [path, method] of [["/", "post"], ["/:id", "put"], ["/:id", "delete"]]) {
-    test(`Staff is forbidden from hotel ${method.toUpperCase()} ${path}`, async () => {
-        const route = findRoute(hotelRouter, path, method);
-        assert.ok(route);
-        const result = await invoke(route.stack[1].handle, request("Staff"));
-        assert.equal(result.statusCode, 403);
-        assert.equal(result.nextCalled, false);
-    });
-
-    test(`Admin is allowed to hotel ${method.toUpperCase()} ${path}`, async () => {
-        const route = findRoute(hotelRouter, path, method);
-        assert.ok(route);
-        const result = await invoke(route.stack[1].handle, request("Admin"));
-        assert.equal(result.statusCode, 200);
-        assert.equal(result.nextCalled, true);
+for (const [path, method] of [["/", "post"], ["/:id", "delete"]]) {
+    test(`hotel ${method.toUpperCase()} ${path} is unavailable for every role`, () => {
+        for (const role of ["Admin", "Staff", "Customer"]) {
+            assert.equal(findRoute(hotelRouter, path, method), undefined, `${role} must not reach a ${method} route`);
+        }
     });
 }
+
+test("Admin can still edit hotels", async () => {
+    const route = findRoute(hotelRouter, "/:id", "put");
+    assert.ok(route);
+    const result = await invoke(route.stack[1].handle, request("Admin"));
+    assert.equal(result.statusCode, 200);
+    assert.equal(result.nextCalled, true);
+});
 
 test("hotel GET routes use optional auth without a role guard", () => {
     for (const path of ["/", "/:id"]) {
