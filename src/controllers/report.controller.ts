@@ -32,7 +32,7 @@ export const getRevenueReportController = async (req: Request, res: Response) =>
 
 export const getOccupancyReportController = async (req: Request, res: Response) => {
     try {
-        const report = await getOccupancyReport(parseReportFilters(req.query as Record<string, unknown>));
+        const report = await getOccupancyReport(parseReportFilters(req.query as Record<string, unknown>), req);
 
         res.json(report);
     } catch (error) {

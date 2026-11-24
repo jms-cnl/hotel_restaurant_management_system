@@ -4,10 +4,11 @@ import test from "node:test";
 process.env.SUPABASE_URL = "https://example.supabase.co";
 process.env.SUPABASE_KEY = "sb_publishable_test-business-data";
 
-const [{ default: reportRouter }, controller, auth] = await Promise.all([
+const [{ default: reportRouter }, controller, auth, reportService] = await Promise.all([
     import("../dist/routes/report.routes.js"),
     import("../dist/controllers/report.controller.js"),
     import("../dist/middleware/auth.middleware.js"),
+    import("../dist/services/report.service.js"),
 ]);
 
 const USER_ID = "00000000-0000-4000-8000-000000000002";
@@ -25,7 +26,7 @@ const dbFetch = ({ assignments = [7], reservations = [hotelReservation, assigned
     const fetch = async (input, init = {}) => {
         const url = new URL(String(input));
         const table = url.pathname.split("/").at(-1);
-        calls.push({ table, url, method: init.method ?? "GET" });
+        calls.push({ table, url, method: init.method ?? "GET", authorization: new Headers(init.headers).get("Authorization") });
         if (table === "staff_restaurant_assignment") return response(assignments.map((restaurant_id) => ({ restaurant_id })));
         if (table === "restaurant_table") {
             const ids = url.searchParams.get("restaurant_id")?.replace(/^in\./, "").replace(/[()]/g, "").split(",").map(Number) ?? [];
@@ -167,5 +168,20 @@ test("Admin reservation and table reports are not assignment-scoped", async () =
         const tables = await invoke(controller.getTableReportController, request("Admin"));
         assert.equal(tables.statusCode, 200);
         assert.equal(tables.body.reservations.length, 2);
+    });
+});
+
+test("Admin and Staff occupancy use the same room calculation with request-scoped access", async () => {
+    const db = dbFetch();
+    await withFetch(db, async () => {
+        const adminRequest = request("Admin");
+        const staffRequest = request("Staff");
+        const admin = await reportService.getOccupancyReport({}, adminRequest);
+        const staff = await reportService.getOccupancyReport({}, staffRequest);
+
+        assert.equal(staff.occupancyRate, admin.occupancyRate);
+        assert.equal(staff.totalRooms, admin.totalRooms);
+        assert.equal(staff.occupiedRooms, admin.occupiedRooms);
+        assert.equal(db.calls.filter((call) => call.table === "room").every((call) => call.authorization === "Bearer request-token"), true);
     });
 });

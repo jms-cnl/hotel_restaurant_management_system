@@ -166,12 +166,13 @@ export const getRevenueReport = async (filters: ReportFilters = {}) => {
     return { totalRevenue: hotelRevenue, hotelRevenue, restaurantRevenue: 0, reservations };
 };
 
-export const getOccupancyReport = async (filters: ReportFilters = {}) => {
-    const { data: rooms, error: roomsError } = await supabase.from("room").select("*, hotel(*)");
+export const getOccupancyReport = async (filters: ReportFilters = {}, req?: Request) => {
+    const client = req ? getRequestSupabase(req) : supabase;
+    const { data: rooms, error: roomsError } = await client.from("room").select("*, hotel(*)");
     if (roomsError) throw roomsError;
     const roomRows = (rooms ?? []).filter((room) => filters.hotelId === undefined || room.hotel_id === filters.hotelId)
         .filter((room) => filters.roomId === undefined || room.room_id === filters.roomId);
-    const reservations = (await getReservationRows({ ...filters, type: "HOTEL", restaurantId: undefined, tableId: undefined }))
+    const reservations = (await getReservationRows({ ...filters, type: "HOTEL", restaurantId: undefined, tableId: undefined }, req))
         .filter((reservation) => reservation.status === "Pending" || reservation.status === "Confirmed");
     const occupiedRoomIds = new Set(reservations.map((reservation) => reservation.room_id).filter(Boolean));
     const roomUtilization = roomRows.map((room) => ({
