@@ -26,19 +26,9 @@ export class DashboardTab extends AdminRouteTab {
     readonly path = "/dashboard";
 }
 
-export class ManageTab extends AdminRouteTab {
-    readonly label = "Manage";
-    readonly path = "/manage";
-}
-
-export class ReservationsTab extends AdminRouteTab {
-    readonly label = "Reservations";
-    readonly path = "/reservations";
-}
-
-export class CombinedBookingsTab extends AdminRouteTab {
-    readonly label = "Combined Bookings";
-    readonly path = "/combined-bookings";
+export class BookingsTab extends AdminRouteTab {
+    readonly label = "Bookings";
+    readonly path = "/bookings";
 }
 
 export class PropertySettingsTab extends AdminRouteTab {
@@ -84,9 +74,7 @@ export class NotificationsTab extends AdminRouteTab {
 
 export const adminTabs: AdminTab[] = [
     new DashboardTab(),
-    new ManageTab(),
-    new ReservationsTab(),
-    new CombinedBookingsTab(),
+    new BookingsTab(),
     new PropertySettingsTab(),
     new RestaurantsTab(),
     new RoomsTab(),
