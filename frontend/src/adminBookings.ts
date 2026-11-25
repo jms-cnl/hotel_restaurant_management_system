@@ -1,5 +1,20 @@
 export type ReservationType = "HOTEL" | "RESTAURANT";
 
+export interface CombinedBookingCountable {
+    readonly combined_booking_id: number;
+}
+
+export function countCombinedBookings(bookings: readonly CombinedBookingCountable[]): number {
+    return bookings.length;
+}
+
+export async function loadCombinedBookingCount<T extends CombinedBookingCountable>(
+    loadBookings: () => Promise<T[]>,
+): Promise<{ bookings: T[]; count: number }> {
+    const bookings = await loadBookings();
+    return { bookings, count: countCombinedBookings(bookings) };
+}
+
 const dateKey = (value: Date) => {
     const year = value.getFullYear();
     const month = String(value.getMonth() + 1).padStart(2, "0");

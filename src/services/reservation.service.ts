@@ -175,6 +175,15 @@ export const updateReservation = async (id: number, reservation: Partial<Reserva
 export const deleteReservation = async (id: number, changedBy: string) => changeReservationStatus(id, { status: "Cancelled", remarks: "Reservation cancelled" }, changedBy);
 
 export const changeReservationStatus = async (id: number, payload: { status: string; remarks?: string }, changedBy: string) => {
+    if (payload.status === "Cancelled") {
+        const { data: current, error: currentError } = await supabase.from("reservation").select("status").eq("reservation_id", id).maybeSingle();
+        if (currentError) throw currentError;
+        if (!current) throw new ReservationError("Reservation not found", 404);
+        if (current.status === "Completed" || current.status === "Cancelled") {
+            throw new ReservationError(`A ${current.status.toLowerCase()} reservation cannot be cancelled`);
+        }
+    }
+
     const { data, error } = await supabase.rpc("change_reservation_status_with_history", {
         p_reservation_id: id,
         p_status: payload.status,

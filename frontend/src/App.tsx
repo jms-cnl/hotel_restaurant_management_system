@@ -13,6 +13,7 @@ import { RestaurantDiscovery } from "./components/RestaurantDiscovery";
 import { CustomerReservations } from "./components/CustomerReservations";
 import { CustomerCombinedBookings } from "./components/CustomerCombinedBookings";
 import { buildCombinedBookingPayload } from "./customerData";
+import { countCombinedBookings, loadCombinedBookingCount } from "./adminBookings";
 import { passwordErrors, passwordRequirements } from "./passwordPolicy";
 import { defaultStatusFor, statusOptionsFor, type CombinedBooking, type Hotel, type InventoryResourceKind, type Reservation, type ReservationHistory, type Restaurant, type RestaurantTable, type Room, type User } from "./types";
 import { AdminInventoryPage } from "./components/AdminInventoryPage";
@@ -245,7 +246,7 @@ function AdminBookingsWorkspace({ initialSection = "manage" }: { initialSection?
     useEffect(() => setActiveSection(initialSection), [initialSection]);
 
     return <section className="admin-bookings-workspace">
-        <nav className="admin-crud-tabs" role="tablist" aria-label="Bookings workspace sections">
+        <nav className="reservation-tabs" role="tablist" aria-label="Bookings workspace sections">
             <button type="button" role="tab" aria-selected={activeSection === "manage"} className={activeSection === "manage" ? "active" : ""} onClick={() => setActiveSection("manage")}>Manage</button>
             <button type="button" role="tab" aria-selected={activeSection === "reservations"} className={activeSection === "reservations" ? "active" : ""} onClick={() => setActiveSection("reservations")}>Reservations</button>
             <button type="button" role="tab" aria-selected={activeSection === "combinedBookings"} className={activeSection === "combinedBookings" ? "active" : ""} onClick={() => setActiveSection("combinedBookings")}>Combined Bookings</button>
@@ -455,10 +456,17 @@ function CombinedStayWizard({ user, onCreated }: { user: User | null; onCreated:
 }
 
 function Reservations({ manageView = false }: { manageView?: boolean } = {}) {
-    const { user } = useAuth(); const manager = isManager(user); const [items, setItems] = useState<Reservation[]>([]); const [combinedItems, setCombinedItems] = useState<CombinedBooking[]>([]); const [itemsLoading, setItemsLoading] = useState(true); const [combinedLoading, setCombinedLoading] = useState(true); const [rooms, setRooms] = useState<Room[]>([]); const [tables, setTables] = useState<RestaurantTable[]>([]); const [selected, setSelected] = useState<Reservation | null>(null); const [selectedCombined, setSelectedCombined] = useState<CombinedBooking | null>(null); const [history, setHistory] = useState<ReservationHistory[]>([]); const [type, setType] = useState("HOTEL"); const [statusFilter, setStatusFilter] = useState(""); const [category, setCategory] = useState<"Hotels" | "Dining" | "Combined">("Hotels"); const [manageType, setManageType] = useState<"Hotel" | "Restaurant" | "Combined">("Hotel"); const [search, setSearch] = useState(""); const [error, setError] = useState(""); const [message, setMessage] = useState(""); const [showCombinedWizard, setShowCombinedWizard] = useState(false);
+    const { user } = useAuth(); const manager = isManager(user); const [items, setItems] = useState<Reservation[]>([]); const [combinedItems, setCombinedItems] = useState<CombinedBooking[]>([]); const [itemsLoading, setItemsLoading] = useState(true); const [combinedLoading, setCombinedLoading] = useState(true); const [combinedError, setCombinedError] = useState(""); const [rooms, setRooms] = useState<Room[]>([]); const [tables, setTables] = useState<RestaurantTable[]>([]); const [selected, setSelected] = useState<Reservation | null>(null); const [selectedCombined, setSelectedCombined] = useState<CombinedBooking | null>(null); const [history, setHistory] = useState<ReservationHistory[]>([]); const [type, setType] = useState("HOTEL"); const [statusFilter, setStatusFilter] = useState(""); const [category, setCategory] = useState<"Hotels" | "Dining" | "Combined">("Hotels"); const [manageType, setManageType] = useState<"Hotel" | "Restaurant" | "Combined">("Hotel"); const [search, setSearch] = useState(""); const [error, setError] = useState(""); const [message, setMessage] = useState(""); const [showCombinedWizard, setShowCombinedWizard] = useState(false);
     const [form, setForm] = useState<Record<string, string>>({});
     const load = () => { setItemsLoading(true); apiGet<Reservation[]>(`/reservations${statusFilter ? `?status=${statusFilter}` : ""}`).then(setItems).catch(e => setError(e.message)).finally(() => setItemsLoading(false)); };
-    const loadCombined = () => { setCombinedLoading(true); apiGet<CombinedBooking[]>("/combined-bookings").then(setCombinedItems).catch(e => setError(e.message)).finally(() => setCombinedLoading(false)); };
+    const loadCombined = () => {
+        setCombinedLoading(true);
+        setCombinedError("");
+        return loadCombinedBookingCount(() => apiGet<CombinedBooking[]>("/combined-bookings"))
+            .then(({ bookings }) => { setCombinedItems(bookings); setCombinedError(""); })
+            .catch(e => { setCombinedItems([]); setCombinedError(e instanceof Error ? e.message : "Unable to load combined bookings"); setError(e instanceof Error ? e.message : "Unable to load combined bookings"); })
+            .finally(() => setCombinedLoading(false));
+    };
     useEffect(() => { load(); loadCombined(); apiGet<Room[]>("/rooms").then(setRooms).catch(() => undefined); apiGet<RestaurantTable[]>("/tables").then(setTables).catch(() => undefined); }, [statusFilter]);
     const submit = async (event: FormEvent) => { event.preventDefault(); setError(""); setMessage(""); try { await apiPost("/reservations", { ...form, reservation_type: type, room_id: type === "HOTEL" ? Number(form.room_id) : null, table_id: type === "RESTAURANT" ? Number(form.table_id) : null }); setForm({}); setMessage("Reservation created"); load(); } catch (e) { setError(e instanceof Error ? e.message : "Reservation failed"); } };
     const show = async (item: Reservation) => { setSelected(item); setSelectedCombined(null); try { setHistory(await apiGet<ReservationHistory[]>(`/reservations/${item.reservation_id}/history`)); } catch (e) { setError(e instanceof Error ? e.message : "History failed"); } };
@@ -494,7 +502,7 @@ function Reservations({ manageView = false }: { manageView?: boolean } = {}) {
         <p className="staff-manage-description">View booking details and manage hotel, table, and combined reservations.</p>
         {message && <div className="alert success">{message}</div>}{error && <div className="alert error">{error}</div>}
         <div className="staff-manage-tabs" role="tablist">
-            {(["Hotel", "Restaurant", "Combined"] as const).map(tab => <button type="button" role="tab" aria-selected={manageType === tab} className={`staff-manage-tab ${manageType === tab ? "active" : ""}`} key={tab} onClick={() => { setManageType(tab); setSelected(null); setSelectedCombined(null); }}>{tab === "Hotel" ? "Hotel Reservations" : tab === "Restaurant" ? "Table Reservations" : "Combined Stays"}<span>{tab === "Hotel" ? hotelCount : tab === "Restaurant" ? diningCount : combinedItems.length}</span></button>)}
+            {(["Hotel", "Restaurant", "Combined"] as const).map(tab => <button type="button" role="tab" aria-selected={manageType === tab} className={`staff-manage-tab ${manageType === tab ? "active" : ""}`} key={tab} onClick={() => { setManageType(tab); setSelected(null); setSelectedCombined(null); if (tab === "Combined") void loadCombined(); }}>{tab === "Hotel" ? "Hotel Reservations" : tab === "Restaurant" ? "Table Reservations" : "Combined Stays"}<span>{tab === "Hotel" ? hotelCount : tab === "Restaurant" ? diningCount : combinedLoading ? "…" : combinedError ? "—" : countCombinedBookings(combinedItems)}</span></button>)}
         </div>
         <div className="staff-manage-toolbar">
             <input type="search" placeholder="Search by reservation ID, guest, or property..." aria-label="Search reservations" value={search} onChange={event => setSearch(event.target.value)} />
@@ -542,12 +550,12 @@ function Reservations({ manageView = false }: { manageView?: boolean } = {}) {
             <div className="reservation-stats">
                 <div className="stat-card"><span>Hotel Bookings</span><strong>{hotelCount}</strong></div>
                 <div className="stat-card"><span>Dining Reservations</span><strong>{diningCount}</strong></div>
-                <div className="stat-card"><span>Combined Stays</span><strong>{combinedItems.length}</strong></div>
+                <div className="stat-card"><span>Combined Stays</span><strong>{combinedLoading ? "…" : combinedError ? "—" : countCombinedBookings(combinedItems)}</strong></div>
                 <div className="stat-card"><span>Upcoming</span><strong className="upcoming-number">{upcomingCount}</strong></div>
             </div>
             <div className="reservation-toolbar">
                 <div className="reservation-tabs">
-                    {(["Hotels", "Dining", "Combined"] as const).map(item => <button key={item} type="button" className={category === item ? "active" : ""} onClick={() => setCategory(item)}>{item}</button>)}
+                    {(["Hotels", "Dining", "Combined"] as const).map(item => <button key={item} type="button" className={category === item ? "active" : ""} onClick={() => { setCategory(item); if (item === "Combined") void loadCombined(); }}>{item}</button>)}
                 </div>
                 <select aria-label="Filter by reservation status" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
                     <option value="">All Statuses</option>{["Pending", "Confirmed", "Rejected", "Cancelled", "Completed"].map(value => <option key={value}>{value}</option>)}
@@ -595,7 +603,7 @@ function Reservations({ manageView = false }: { manageView?: boolean } = {}) {
                             <div className="reservation-card-footer">
                                 {nightlyRate ? <strong className="reservation-price">{nightlyRate}</strong> : <span />}
                                 <div>
-                                    {manager && item.status !== "Cancelled" && <button type="button" className="cancel-reservation-button" onClick={() => status(item, "Cancelled")}>Cancel</button>}
+                                    {manager && !["Cancelled", "Completed"].includes(item.status) && <button type="button" className="cancel-reservation-button" onClick={() => status(item, "Cancelled")}>Cancel</button>}
                                 </div>
                             </div>
                         </div>
@@ -613,7 +621,7 @@ function CombinedBookings() {
     const load = () => { setLoading(true); apiGet<CombinedBooking[]>('/combined-bookings').then(setItems).catch(e => setError(e.message)).finally(() => setLoading(false)); };
     useEffect(() => { load(); apiGet<Room[]>('/rooms').then(setRooms).catch(() => undefined); apiGet<RestaurantTable[]>('/tables').then(setTables).catch(() => undefined); }, []);
     const status = async (item: CombinedBooking, next: string) => { try { await apiPatch(`/combined-bookings/${item.combined_booking_id}/status`, { status: next }); load(); } catch (e) { setError(e instanceof Error ? e.message : 'Status update failed'); } };
-    return <section className="listing-section staff-manage-page"><p className="eyebrow">STAFF WORKSPACE</p><h1>Combined Bookings</h1>{error && <div className="alert error">{error}</div>}<div className="staff-table-wrap"><table className="staff-reservations-table"><thead><tr><th>Reservation</th><th>Guest</th><th>Property / Booking</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead><tbody>{items.map(item => {
+    return <section className="listing-section staff-manage-page"><p className="eyebrow">{isAdmin(user) ? "ADMIN WORKSPACE" : "STAFF WORKSPACE"}</p><h1>Combined Bookings</h1>{error && <div className="alert error">{error}</div>}<div className="staff-table-wrap"><table className="staff-reservations-table"><thead><tr><th>Reservation</th><th>Guest</th><th>Property / Booking</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead><tbody>{items.map(item => {
         const hotelReservation = item.reservation?.find(reservation => reservation.room_id != null);
         const diningReservation = item.reservation?.find(reservation => reservation.table_id != null);
         const room = rooms.find(candidate => candidate.room_id === hotelReservation?.room_id) ?? hotelReservation?.room;
