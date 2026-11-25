@@ -125,6 +125,7 @@ export function HotelDetails() {
     const sideImages = gallery.filter((item) => item.media_id !== mainImage?.media_id).slice(0, 2);
     const venueBookable = isVenueBookable(hotel.status);
     const hotelCity = getAddressCity(hotel.address);
+    const availableRoomTypes = rooms.filter((room) => room.status.toLowerCase() === "available").length;
     return <div className="hotel-detail-page">
         <Link to="/home" className="hotel-back-link">← Back to Home</Link>
         <div className="hotel-detail-gallery">
@@ -135,7 +136,7 @@ export function HotelDetails() {
         {hotel.description && <p className="hotel-detail-description">{hotel.description}</p>}
         {amenitiesError ? <div className="customer-form-note" role="status">Hotel amenities are unavailable.</div> : amenities.length > 0 && <div className="hotel-detail-tags" aria-label="Hotel amenities">{amenities.map((amenity) => <span key={amenity.amenity_id}>{amenity.name}</span>)}</div>}
         <section className="hotel-rooms-section">
-            <div className="hotel-rooms-heading"><div><p className="eyebrow">FIND YOUR PERFECT STAY</p><h2>Available Rooms</h2></div><span>{rooms.filter((room) => room.status.toLowerCase() === "available").length} room types available</span></div>
+            <div className="hotel-rooms-heading"><div><p className="eyebrow">FIND YOUR PERFECT STAY</p><h2>Available Rooms</h2></div><span>{availableRoomTypes} {availableRoomTypes === 1 ? "room type" : "room types"} available</span></div>
             {rooms.length ? <div className="hotel-room-list">{rooms.map((room) => {
                 const roomImage = primaryMedia(roomMedia[room.room_id] ?? []);
                 const available = room.status.toLowerCase() === "available";

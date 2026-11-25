@@ -133,6 +133,12 @@ export const filterReservations = <T extends { reservation_type: string; status:
 export const isVenueBookable = (status: string | null | undefined): boolean =>
     status?.trim().toLocaleLowerCase() === "active";
 
+export const isValidDateRange = (checkIn: string, checkOut: string) =>
+    Boolean(checkIn && checkOut && checkOut > checkIn);
+
+export const isValidTimeRange = (startTime: string, endTime: string) =>
+    Boolean(startTime && endTime && endTime > startTime);
+
 export const canCancelReservation = (reservation: { status: string; combined_booking_id?: number | null }) =>
     reservation.combined_booking_id == null &&
     ["pending", "confirmed"].includes(normalized(reservation.status));
