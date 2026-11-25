@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiGet, apiPost } from "../api";
 import { buildHotelReservationPayload, getAddressCity, isVenueBookable, mergeRoomMedia, refreshRoomMediaOnce } from "../customerData";
-import type { Hotel, Media, Room } from "../types";
+import type { Hotel, Media, Restaurant, Room } from "../types";
 
 type Amenity = { amenity_id: number; name: string };
 const primaryMedia = (items: Media[]) => items.find((item) => item.is_primary) ?? items[0];
@@ -12,6 +12,8 @@ export function HotelDetails() {
     const id = Number(hotelId);
     const [hotel, setHotel] = useState<Hotel | null>(null);
     const [rooms, setRooms] = useState<Room[]>([]);
+    const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+    const [restaurantsError, setRestaurantsError] = useState(false);
     const [media, setMedia] = useState<Media[]>([]);
     const [roomMedia, setRoomMedia] = useState<Record<number, Media[]>>({});
     const [amenities, setAmenities] = useState<Amenity[]>([]);
@@ -33,6 +35,8 @@ export function HotelDetails() {
         setError("");
         setHotel(null);
         setRooms([]);
+        setRestaurants([]);
+        setRestaurantsError(false);
         setMedia([]);
         setRoomMedia({});
         attemptedRoomMediaRefreshes.current.clear();
@@ -48,9 +52,10 @@ export function HotelDetails() {
         Promise.all([
             apiGet<Hotel>(`/hotels/${id}`),
             apiGet<Room[]>("/rooms"),
+            apiGet<Restaurant[]>("/restaurants").then((rows) => ({ rows, failed: false })).catch(() => ({ rows: [] as Restaurant[], failed: true })),
             apiGet<Media[]>(`/media/hotel/${id}`).catch(() => [] as Media[]),
             apiGet<Amenity[]>(`/amenities?hotel_id=${id}`).then((rows) => ({ rows, failed: false })).catch(() => ({ rows: [] as Amenity[], failed: true })),
-        ]).then(async ([hotelData, roomRows, mediaRows, amenityResult]) => {
+        ]).then(async ([hotelData, roomRows, restaurantResult, mediaRows, amenityResult]) => {
             const hotelRooms = roomRows.filter((room) => room.hotel_id === id);
             const entries = await Promise.all(hotelRooms.map(async (room) => {
                 try { return [room.room_id, await apiGet<Media[]>(`/media/room/${room.room_id}`)] as const; }
@@ -59,6 +64,8 @@ export function HotelDetails() {
             if (!active) return;
             setHotel(hotelData);
             setRooms(hotelRooms);
+            setRestaurants(restaurantResult.rows);
+            setRestaurantsError(restaurantResult.failed);
             setMedia(mediaRows);
             setRoomMedia(Object.fromEntries(entries));
             setAmenities(amenityResult.rows);
@@ -138,6 +145,12 @@ export function HotelDetails() {
                     <div className="hotel-room-booking"><span className={`hotel-room-status ${available ? "is-available" : "is-booked"}`}>{room.status}</span><strong>₱{Number(room.price_per_night).toLocaleString("en-PH")}<small>/ night</small></strong><button type="button" className="restaurant-detail-book-button" disabled={!venueBookable || !available} onClick={() => openBooking(room)}>Book Room</button></div>
                 </article>;
             })}</div> : <div className="customer-empty-state">No rooms are listed for this hotel.</div>}
+        </section>
+        <section className="hotel-restaurants-section" aria-labelledby="hotel-restaurants-title">
+            <div className="hotel-rooms-heading"><div><p className="eyebrow">DINING AT MAISON VALMENT</p><h2 id="hotel-restaurants-title">Restaurants</h2></div><span>{restaurants.length} {restaurants.length === 1 ? "restaurant" : "restaurants"}</span></div>
+            {restaurantsError ? <div className="customer-form-note" role="status">Restaurant information is unavailable.</div> : restaurants.length ? <div className="hotel-restaurant-grid">{restaurants.map((restaurant) => <article className="hotel-restaurant-card" key={restaurant.restaurant_id}>
+                <p className="eyebrow">RESTAURANT · {restaurant.status}</p><h3>{restaurant.name}</h3><p>{restaurant.description || "Explore the menu and reserve a table."}</p><small>{restaurant.address}</small><Link to={`/restaurants/${restaurant.restaurant_id}`}>View restaurant details</Link>
+            </article>)}</div> : <div className="customer-empty-state">No restaurants are listed for Maison Valment.</div>}
         </section>
         {!venueBookable && <div className="customer-form-note">This hotel is not active and cannot accept reservation requests.</div>}
         {selectedRoom && <div className="booking-overlay" role="presentation" onClick={() => setSelectedRoom(null)}>

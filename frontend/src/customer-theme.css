@@ -1645,6 +1645,44 @@
   font-size: 0.75rem;
 }
 
+.hotel-restaurants-section {
+  margin-top: 42px;
+  color: #f7f5ef;
+}
+
+.hotel-restaurant-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.hotel-restaurant-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 20px;
+  border: 1px solid #29394b;
+  border-radius: 8px;
+  background: #202e40;
+}
+
+.hotel-restaurant-card .eyebrow,
+.hotel-restaurant-card h3,
+.hotel-restaurant-card p { margin: 0; }
+
+.hotel-restaurant-card h3 { color: #f7f5ef; font-size: 1.05rem; }
+.hotel-restaurant-card p:not(.eyebrow), .hotel-restaurant-card small { color: #aab9c9; line-height: 1.5; }
+.hotel-restaurant-card a, .property-return-link { color: #e4bd70; text-decoration: none; }
+.hotel-restaurant-card a:hover, .property-return-link:hover { color: #f0d194; }
+
+.property-return-link {
+  display: inline-block;
+  margin-bottom: 20px;
+  font-size: 0.82rem;
+}
+
 .hotel-room-list {
   display: flex;
   flex-direction: column;
@@ -1798,6 +1836,8 @@
 
 @media (max-width: 700px) {
   .hotel-detail-page, .restaurant-detail-page { padding: 20px 16px 40px; }
+
+  .hotel-restaurant-grid { grid-template-columns: 1fr; }
 
   .hotel-detail-gallery, .restaurant-detail-gallery {
     grid-template-columns: minmax(0, 2fr) minmax(90px, 1fr);

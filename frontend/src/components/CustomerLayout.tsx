@@ -3,7 +3,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
 
 const customerLinks = [
-    ["Hotels & Restaurants", "/home"],
+    ["Hotel & Restaurant", "/home"],
     ["My Reservations", "/reservations"],
 ] as const;
 

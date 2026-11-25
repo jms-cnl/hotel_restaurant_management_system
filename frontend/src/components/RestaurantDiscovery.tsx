@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiGet } from "../api";
 import { filterRestaurants } from "../customerData";
-import type { Media, Restaurant, RestaurantTable } from "../types";
+import type { Hotel, Media, Restaurant, RestaurantTable } from "../types";
 
 const primaryImageUrl = (media: Media[]) => media.find((item) => item.is_primary)?.url ?? media[0]?.url;
 
 export function RestaurantDiscovery() {
     const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
     const [tables, setTables] = useState<RestaurantTable[]>([]);
+    const [hotelId, setHotelId] = useState<number | null>(null);
     const [search, setSearch] = useState("");
     const [availability, setAvailability] = useState("all");
     const [images, setImages] = useState<Record<number, string>>({});
@@ -25,6 +26,9 @@ export function RestaurantDiscovery() {
         apiGet<RestaurantTable[]>("/tables")
             .then((tableRows) => { if (active) setTables(tableRows); })
             .catch(() => { if (active) setTableSummaryUnavailable(true); });
+        apiGet<Hotel[]>("/hotels")
+            .then((hotelRows) => { if (active) setHotelId(hotelRows[0]?.hotel_id ?? null); })
+            .catch(() => {});
         return () => { active = false; };
     }, []);
 
@@ -46,6 +50,7 @@ export function RestaurantDiscovery() {
 
     return <div className="customer-discovery">
         <section className="hero customer-hero compact-hero">
+            {hotelId !== null && <Link className="property-return-link" to={`/hotels/${hotelId}`}>← Back to Maison Valment</Link>}
             <p className="eyebrow">DINING AT MAISON VALMENT</p>
             <h1>Discover great dining.</h1>
             <p className="hero-description">Explore restaurants and table options at Maison Valment.</p>
