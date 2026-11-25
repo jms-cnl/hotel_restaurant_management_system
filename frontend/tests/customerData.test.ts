@@ -20,6 +20,8 @@ import {
     combinedVenueLabel,
     countWhenAvailable,
     refreshRoomMediaOnce,
+    isValidDateRange,
+    isValidTimeRange,
 } from "../src/customerData.ts";
 
 test("room media refresh can be claimed only once per room", () => {
@@ -206,6 +208,15 @@ test("buildCombinedBookingPayload nests hotel and restaurant reservations", () =
         hotel_reservation: { room_id: 7, check_in_date: "2026-11-01", check_out_date: "2026-11-03" },
         restaurant_reservation: { table_id: 9, reservation_date: "2026-11-01", start_time: "18:00", end_time: "19:30" },
     });
+});
+
+test("combined wizard date and time ranges must be present and strictly increasing", () => {
+    assert.equal(isValidDateRange("2026-11-01", "2026-11-02"), true);
+    assert.equal(isValidDateRange("2026-11-01", "2026-11-01"), false);
+    assert.equal(isValidDateRange("", "2026-11-02"), false);
+    assert.equal(isValidTimeRange("18:00", "19:30"), true);
+    assert.equal(isValidTimeRange("19:30", "18:00"), false);
+    assert.equal(isValidTimeRange("", "19:30"), false);
 });
 
 test("filterReservations applies category and status filters", () => {
