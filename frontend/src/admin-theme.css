@@ -602,6 +602,16 @@
   font-weight: 700;
 }
 
+.admin-app .admin-bookings-workspace > .reservation-tabs {
+  width: fit-content;
+  max-width: 100%;
+  margin: 24px 0 18px;
+}
+
+.admin-app .admin-bookings-workspace > .reservation-tabs button {
+  white-space: nowrap;
+}
+
 .admin-app .reservation-toolbar > select {
   max-width: 180px;
   padding: 10px;
@@ -2845,6 +2855,10 @@
   font-size: 0.82rem;
   vertical-align: middle;
   overflow-wrap: anywhere;
+}
+
+.admin-app .staff-reservations-table .reservation-status.completed {
+  white-space: nowrap;
 }
 
 .admin-app .staff-reservations-table td strong,
