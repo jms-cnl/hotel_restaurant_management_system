@@ -90,7 +90,7 @@ export function CustomerHome() {
             <p className="hero-description">Discover comfortable stays and memorable dining experiences, all in one place.</p>
             <form className="search-area" onSubmit={submitSearch}>
                 <div className="search-bar">
-                    <input aria-label="Search hotels or restaurants" placeholder="Search hotels or restaurants..." value={search} onChange={(event) => setSearch(event.target.value)} />
+                    <input aria-label="Search hotel or restaurant" placeholder="Search hotel or restaurant..." value={search} onChange={(event) => setSearch(event.target.value)} />
                     <button type="submit">Search</button>
                 </div>
                 <div className="filter-bar">
