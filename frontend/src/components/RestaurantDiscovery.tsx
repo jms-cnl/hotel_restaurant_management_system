@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiGet } from "../api";
-import { filterRestaurants, getAddressLocations } from "../customerData";
+import { filterRestaurants } from "../customerData";
 import type { Media, Restaurant, RestaurantTable } from "../types";
 
 const primaryImageUrl = (media: Media[]) => media.find((item) => item.is_primary)?.url ?? media[0]?.url;
@@ -10,7 +10,6 @@ export function RestaurantDiscovery() {
     const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
     const [tables, setTables] = useState<RestaurantTable[]>([]);
     const [search, setSearch] = useState("");
-    const [location, setLocation] = useState("all");
     const [availability, setAvailability] = useState("all");
     const [images, setImages] = useState<Record<number, string>>({});
     const [loading, setLoading] = useState(true);
@@ -40,22 +39,19 @@ export function RestaurantDiscovery() {
         return () => { active = false; };
     }, [restaurants]);
 
-    const locations = getAddressLocations(restaurants);
     const visibleRestaurants = useMemo(() => filterRestaurants(restaurants, tables, {
         search,
-        location,
         availability: tableSummaryUnavailable ? "all" : availability,
-    }), [restaurants, tables, search, location, availability, tableSummaryUnavailable]);
+    }), [restaurants, tables, search, availability, tableSummaryUnavailable]);
 
     return <div className="customer-discovery">
         <section className="hero customer-hero compact-hero">
-            <p className="eyebrow">DISCOVER GREAT DINING</p>
-            <h1>Find your next<br />favorite restaurant.</h1>
-            <p className="hero-description">Explore local restaurants and see the table options currently listed for each one.</p>
+            <p className="eyebrow">DINING AT MAISON VALMENT</p>
+            <h1>Discover great dining.</h1>
+            <p className="hero-description">Explore restaurants and table options at Maison Valment.</p>
             <div className="search-area">
-                <form className="search-bar" onSubmit={(event) => event.preventDefault()}><input aria-label="Search restaurants" placeholder="Search restaurants or locations" value={search} onChange={(event) => setSearch(event.target.value)} /><button type="submit">Search</button></form>
+                <form className="search-bar" onSubmit={(event) => event.preventDefault()}><input aria-label="Search restaurants" placeholder="Search restaurants" value={search} onChange={(event) => setSearch(event.target.value)} /><button type="submit">Search</button></form>
                 <div className="filter-bar restaurant-filter-bar">
-                    <label>Location<select aria-label="Filter by location" value={location} onChange={(event) => setLocation(event.target.value)}><option value="all">All Locations</option>{locations.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
                     <label>Availability<select aria-label="Filter by availability" value={availability} onChange={(event) => setAvailability(event.target.value)} disabled={tableSummaryUnavailable}><option value="all">Any Availability</option><option value="available">Available</option><option value="unavailable">Unavailable</option></select></label>
                 </div>
             </div>
@@ -63,7 +59,7 @@ export function RestaurantDiscovery() {
         {error && <div className="alert error customer-alert" role="alert">{error}</div>}
         {tableSummaryUnavailable && !loading && restaurants.length > 0 && <p className="customer-form-note">Table counts and availability are unavailable right now. You can still browse restaurant records; the related filter is disabled.</p>}
         <section className="listing-section customer-listing-section">
-            <div className="section-heading"><div><p className="eyebrow">RESTAURANT DIRECTORY</p><h2>{loading ? "Loading restaurants…" : `${visibleRestaurants.length} ${visibleRestaurants.length === 1 ? "restaurant" : "restaurants"}`}</h2></div></div>
+            <div className="section-heading"><div><p className="eyebrow">MAISON VALMENT</p><h2>{loading ? "Loading restaurants…" : "Restaurants at Maison Valment"}</h2></div></div>
             {loading ? <div className="customer-empty-state">Loading restaurant records…</div> : visibleRestaurants.length ? <div className="sample-listings">
                 {visibleRestaurants.map((restaurant) => {
                     const tableCount = tables.filter((table) => table.restaurant_id === restaurant.restaurant_id).length;
