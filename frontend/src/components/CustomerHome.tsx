@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { apiGet } from "../api";
-import { BUDGET_TIERS, filterHotels, filterRestaurants, getAddressLocations } from "../customerData";
+import { BUDGET_TIERS, filterHotels, filterRestaurants } from "../customerData";
 import type { Hotel, Media, Restaurant, RestaurantTable, Room } from "../types";
 
 const primaryImageUrl = (media: Media[]) => media.find((item) => item.is_primary)?.url ?? media[0]?.url;
@@ -14,7 +14,6 @@ export function CustomerHome() {
     const [hotelImages, setHotelImages] = useState<Record<number, string>>({});
     const [restaurantImages, setRestaurantImages] = useState<Record<number, string>>({});
     const [search, setSearch] = useState("");
-    const [location, setLocation] = useState("all");
     const [budgetTier, setBudgetTier] = useState("all");
     const [availability, setAvailability] = useState("all");
     const [loading, setLoading] = useState(true);
@@ -46,18 +45,20 @@ export function CustomerHome() {
         return () => { active = false; };
     }, []);
 
-    const locations = getAddressLocations([...hotels, ...restaurants]);
     const visibleHotels = useMemo(() => filterHotels(hotels, rooms, {
         search,
-        location,
         budgetTier: inventoryError.includes("Hotel") ? "all" : budgetTier,
         availability: inventoryError ? "all" : availability,
-    }).slice(0, 3), [hotels, rooms, search, location, budgetTier, availability, inventoryError]);
+    }), [hotels, rooms, search, budgetTier, availability, inventoryError]);
     const visibleRestaurants = useMemo(() => filterRestaurants(restaurants, tables, {
         search,
-        location,
         availability: inventoryError ? "all" : availability,
-    }).slice(0, 3), [restaurants, tables, search, location, availability, inventoryError]);
+    }), [restaurants, tables, search, availability, inventoryError]);
+    const featuredHotel = visibleHotels[0];
+    const availableRoomRates = featuredHotel
+        ? rooms.filter((room) => room.hotel_id === featuredHotel.hotel_id && room.status.toLowerCase() === "available").map((room) => Number(room.price_per_night)).filter(Number.isFinite)
+        : [];
+    const lowestRoomRate = availableRoomRates.length ? Math.min(...availableRoomRates) : null;
 
     useEffect(() => {
         let active = true;
@@ -93,25 +94,24 @@ export function CustomerHome() {
                     <button type="submit">Search</button>
                 </div>
                 <div className="filter-bar">
-                    <label>Location<select value={location} onChange={(event) => setLocation(event.target.value)}><option value="all">All Locations</option>{locations.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
                     <label>Budget<select value={budgetTier} onChange={(event) => setBudgetTier(event.target.value)} disabled={inventoryError.includes("Hotel")}><option value="all">Any Budget</option>{BUDGET_TIERS.map((tier) => <option key={tier.value} value={tier.value}>{tier.label}</option>)}</select></label>
                     <label>Availability<select value={availability} onChange={(event) => setAvailability(event.target.value)} disabled={Boolean(inventoryError)}><option value="all">Any Availability</option><option value="available">Available</option><option value="unavailable">Unavailable</option></select></label>
                 </div>
                 <p className="customer-filter-note">Budget uses the lowest available room rate per night; it does not filter restaurant listings.</p>
             </form>
-            <div className="hero-links"><Link to="/hotels" className="signup-button">Explore hotels</Link><Link to="/restaurants" className="login-button">Discover dining</Link></div>
+            <div className="hero-links"><Link to="/hotels" className="signup-button">View Maison Valment</Link><Link to="/restaurants" className="login-button">Discover dining</Link></div>
         </section>
 
         {error && <div className="alert error customer-alert" role="alert">{error}</div>}
         {inventoryError && <p className="customer-form-note">{inventoryError}. Related filters are disabled.</p>}
         <section className="listing-section customer-listing-section">
-            <div className="section-heading"><div><p className="eyebrow">HANDPICKED FOR YOU</p><h2>{loading ? "Loading hotels…" : "Explore Places to Stay"}</h2></div><Link to="/hotels">View all hotels</Link></div>
-            {loading ? <p className="customer-empty-state">Loading hotels…</p> : visibleHotels.length ? <div className="sample-listings">
-                {visibleHotels.map((hotel) => <Link className="sample-card customer-resource-card" key={hotel.hotel_id} to={`/hotels/${hotel.hotel_id}`}>
-                    <div className="customer-card-visual hotel-visual">{hotelImages[hotel.hotel_id] ? <img src={hotelImages[hotel.hotel_id]} alt={hotel.name} /> : <span aria-hidden="true">H</span>}</div>
-                    <div className="sample-card-body"><p className="eyebrow">HOTEL · {hotel.status}</p><h3>{hotel.name}</h3><p>{hotel.address}</p><p className="customer-card-description">{hotel.description || "Explore rooms and rates for this property."}</p><span className="signup-button">View Hotel</span></div>
-                </Link>)}
-            </div> : !error && <div className="customer-empty-state"><h3>No hotels match these filters</h3><p>Try another search or check back when listings are available.</p></div>}
+            <div className="section-heading"><div><p className="eyebrow">YOUR HOTEL</p><h2>{loading ? "Loading Maison Valment…" : featuredHotel?.name ?? "Maison Valment"}</h2></div></div>
+            {loading ? <p className="customer-empty-state">Loading hotel details…</p> : featuredHotel ? <div className="sample-listings">
+                <Link className="sample-card customer-resource-card" to={`/hotels/${featuredHotel.hotel_id}`}>
+                    <div className="customer-card-visual hotel-visual">{hotelImages[featuredHotel.hotel_id] ? <img src={hotelImages[featuredHotel.hotel_id]} alt={featuredHotel.name} /> : <span aria-hidden="true">H</span>}</div>
+                    <div className="sample-card-body"><p className="eyebrow">HOTEL · {featuredHotel.status}</p><h3>{featuredHotel.name}</h3><p>{featuredHotel.address}</p><p className="customer-card-description">{featuredHotel.description || "Explore rooms and rates at Maison Valment."}</p>{lowestRoomRate !== null && <p className="sample-price">₱{lowestRoomRate.toLocaleString("en-PH")} <span>/ night, lowest available room</span></p>}<span className="signup-button">View rooms and amenities</span></div>
+                </Link>
+            </div> : !error && <div className="customer-empty-state"><h3>Maison Valment is not available</h3><p>Please check back later.</p></div>}
         </section>
 
         <section className="listing-section customer-listing-section">
