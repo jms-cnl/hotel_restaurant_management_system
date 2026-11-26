@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
-import { apiDelete, apiGet, apiPatch, apiPost, apiPut, reportMeaningfulActivity } from "./api";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut, bootstrapCsrfToken, clearCsrfToken, reportMeaningfulActivity } from "./api";
 import { authSession } from "./auth-session";
 import { useAuth } from "./auth";
 import { CustomerHome } from "./components/CustomerHome";
@@ -649,6 +649,31 @@ function Profile() {
     const [passwordForm, setPasswordForm] = useState({ current: "", next: "", confirm: "" });
     const [message, setMessage] = useState(""); const [error, setError] = useState("");
     const [activeTab, setActiveTab] = useState<"info" | "password">("info"); const [editingProfile, setEditingProfile] = useState(false);
+    const customerPasswordRequest = async () => {
+        const apiBase = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/+$/, "");
+        const sendRequest = async (csrfToken: string) => fetch(`${apiBase}/auth/change-password`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
+            body: JSON.stringify({ current_password: passwordForm.current, new_password: passwordForm.next }),
+        });
+        let response = await sendRequest(await bootstrapCsrfToken());
+        let result = await response.json().catch(() => null) as { message?: unknown } | null;
+        if (response.status === 403 && result?.message === "Invalid or missing CSRF token") {
+            clearCsrfToken();
+            response = await sendRequest(await bootstrapCsrfToken());
+            result = await response.json().catch(() => null) as { message?: unknown } | null;
+        }
+        const responseMessage = typeof result?.message === "string" ? result.message : "Password change failed";
+        if (!response.ok) {
+            if (response.status === 401 && responseMessage !== "Current password is incorrect") {
+                window.dispatchEvent(new Event("hrms:session-expired"));
+            }
+            throw new Error(responseMessage);
+        }
+        window.dispatchEvent(new Event("hrms:activity"));
+        return { message: responseMessage };
+    };
     useEffect(() => {
         if (manager) return;
         let active = true;
@@ -661,6 +686,7 @@ function Profile() {
     const profileStats = deriveCustomerProfileStats(customerReservations, new Date().toISOString().slice(0, 10));
     const submit = async (event: FormEvent) => { event.preventDefault(); setError(""); try { await updateProfile(form); setMessage("Profile updated"); setEditingProfile(false); } catch (e) { setError(e instanceof Error ? e.message : "Update failed"); } };
     const changePassword = async (event: FormEvent) => { event.preventDefault(); setError(""); setMessage(""); if (passwordErrors(passwordForm.next).length) { setError(`Password does not meet the requirements: ${passwordErrors(passwordForm.next).join(", ")}`); return; } if (passwordForm.next !== passwordForm.confirm) { setError("Password confirmation does not match"); return; } try { const result = await apiPost<{ message: string }>("/auth/change-password", { current_password: passwordForm.current, new_password: passwordForm.next }); setMessage(result.message); setPasswordForm({ current: "", next: "", confirm: "" }); } catch (e) { setError(e instanceof Error ? e.message : "Password change failed"); } };
+    const changeCustomerPassword = async (event: FormEvent) => { event.preventDefault(); setError(""); setMessage(""); if (passwordErrors(passwordForm.next).length) { setError(`Password does not meet the requirements: ${passwordErrors(passwordForm.next).join(", ")}`); return; } if (passwordForm.next !== passwordForm.confirm) { setError("Password confirmation does not match"); return; } try { const result = await customerPasswordRequest(); setMessage(result.message); setPasswordForm({ current: "", next: "", confirm: "" }); } catch (e) { setError(e instanceof Error ? e.message : "Password change failed"); } };
     if (manager) return <main className="customer-profile-page">
         <div className="customer-profile-container">
             <section className="profile-overview-card">
@@ -723,14 +749,13 @@ function Profile() {
                     <p>{label}</p><strong>{customerReservationsLoading ? "…" : value ?? "—"}</strong>
                 </article>)}
             </section>
-            {error && <p className="profile-notice" role="alert">{error}</p>}
             {!customerReservationsLoading && customerReservations === null && <p className="profile-notice" role="status">Unable to load booking statistics. Please try again later.</p>}
-            {message && <p className="profile-notice" role="status">{message}</p>}
             <nav className="profile-tabs" aria-label="Profile sections">
                 <button type="button" className={activeTab === "info" ? "active" : ""} onClick={() => { setActiveTab("info"); setMessage(""); }}>Profile Info</button>
                 <button type="button" className={activeTab === "password" ? "active" : ""} onClick={() => { setActiveTab("password"); setMessage(""); }}>Change Password</button>
             </nav>
             {activeTab === "info" && <section className="profile-content-card">
+                {error && <p className="profile-notice" role="alert">{error}</p>}{message && <p className="profile-notice" role="status">{message}</p>}
                 <div className="profile-section-heading"><h2>Profile Information</h2><button type="button" className="profile-outline-button" onClick={() => { setEditingProfile(!editingProfile); setMessage(""); }}>{editingProfile ? "Cancel" : "Edit Profile"}</button></div>
                 {editingProfile ? <form className="profile-edit-form" onSubmit={submit}>
                     <label>First Name<input value={form.first_name} onChange={event => setForm({ ...form, first_name: event.target.value })} required /></label>
@@ -747,8 +772,9 @@ function Profile() {
                 </div>}
             </section>}
             {activeTab === "password" && <section className="profile-content-card">
+                {error && <p className="profile-notice" role="alert">{error}</p>}{message && <p className="profile-notice" role="status">{message}</p>}
                 <div className="profile-section-heading"><h2>Change Password</h2></div>
-                <form className="profile-edit-form profile-password-form" onSubmit={changePassword}>
+                <form className="profile-edit-form profile-password-form" onSubmit={changeCustomerPassword}>
                     <label>Current Password<input type="password" autoComplete="current-password" value={passwordForm.current} onChange={event => setPasswordForm({ ...passwordForm, current: event.target.value })} required /></label>
                     <label>New Password<input type="password" autoComplete="new-password" value={passwordForm.next} onChange={event => setPasswordForm({ ...passwordForm, next: event.target.value })} required /></label>
                     <PasswordRequirements password={passwordForm.next} />
