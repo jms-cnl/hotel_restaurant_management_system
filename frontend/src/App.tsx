@@ -84,7 +84,7 @@ function AuthPage({ registerMode = false }: { registerMode?: boolean }) {
             else { await login(form.email, form.password); navigate("/"); }
         } catch (caught) { setError(caught instanceof Error ? caught.message : "Request failed"); }
     };
-    return <main className="auth-page"><form className="auth-card" onSubmit={submit}>
+    return <main className={registerMode ? "auth-page" : "auth-page customer-auth-page"}><form className="auth-card" onSubmit={submit}>
         <Link to="/login" className="auth-brand">StayEase</Link>
         <p className="auth-eyebrow">{registerMode ? "START YOUR NEXT GETAWAY" : "WELCOME BACK"}</p>
         <h1>{registerMode ? "Create your account" : "Log in to StayEase"}</h1>
@@ -285,7 +285,31 @@ function CustomerNotifications() {
     const load = () => { setLoading(true); return apiGet<Record<string, unknown>[]>("/notifications").then(setItems).catch(e => setError(e.message)).finally(() => setLoading(false)); };
     useEffect(() => { void load(); }, []);
     const markRead = async (id: number) => { try { await apiPatch(`/notifications/${id}/read`, {}); load(); } catch (e) { setError(e instanceof Error ? e.message : "Unable to update notification"); } };
-    return <Page title="Notifications" error={error} loading={loading}>{items.length ? <div className="detail"><ul>{items.map(item => <li key={String(item.notification_id)}><strong>{String(item.title)}</strong>: {String(item.message)} <small>{item.created_at ? new Date(String(item.created_at)).toLocaleString() : ""}</small> {Boolean(item.is_read) ? <span>Read</span> : <button onClick={() => markRead(Number(item.notification_id))}>Mark read</button>}</li>)}</ul></div> : <p className="empty">No notifications.</p>}</Page>;
+    return <section className="listing-section customer-notifications-page">
+        <header className="customer-notifications-heading">
+            <p className="eyebrow">YOUR ACCOUNT</p>
+            <h1>Notifications</h1>
+            <p>Updates about your reservations and account.</p>
+        </header>
+        {error && <div className="alert error" role="alert">{error}</div>}
+        {loading ? <p className="customer-notifications-state" role="status">Loading notifications…</p> : items.length ? <div className="customer-notification-list">
+            {items.map(item => {
+                const isRead = Boolean(item.is_read);
+                const createdAt = typeof item.created_at === "string" ? item.created_at : "";
+                return <article className={`customer-notification-card ${isRead ? "is-read" : "is-unread"}`} key={String(item.notification_id)}>
+                    <div className="customer-notification-copy">
+                        <div className="customer-notification-title-row">
+                            <h2>{String(item.title)}</h2>
+                            <span className="customer-notification-state" aria-label={isRead ? "Read" : "Unread"}>{isRead ? "Read" : "Unread"}</span>
+                        </div>
+                        <p>{String(item.message)}</p>
+                        <time dateTime={createdAt || undefined}>{createdAt ? new Date(createdAt).toLocaleString() : "Date unavailable"}</time>
+                    </div>
+                    {!isRead && <button type="button" className="customer-notification-read-button" onClick={() => markRead(Number(item.notification_id))}>Mark as read</button>}
+                </article>;
+            })}
+        </div> : <div className="customer-notifications-empty"><h2>No notifications yet</h2><p>Reservation and account updates will appear here.</p></div>}
+    </section>;
 }
 
 function Users() {

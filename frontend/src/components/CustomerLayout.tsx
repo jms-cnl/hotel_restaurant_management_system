@@ -23,7 +23,7 @@ export function CustomerLayout({ children }: { children: ReactNode }) {
                 {customerLinks.map(([label, path]) => <NavLink key={path} to={path} end={path === "/home"}>{label}</NavLink>)}
             </nav>
             <div className="customer-nav-actions">
-                <NavLink className="notification-link" to="/notifications" aria-label="Notifications" title="Notifications">🔔</NavLink>
+                <NavLink className={({ isActive }) => `notification-link${isActive ? " active" : ""}`} to="/notifications" aria-label="Notifications" title="Notifications">🔔</NavLink>
                 <NavLink className="customer-profile-link" to="/profile">My Profile</NavLink>
                 <button className="customer-signout-button" type="button" onClick={() => void signOut()}>Sign out</button>
             </div>
