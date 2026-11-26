@@ -1939,6 +1939,7 @@
   border: 1px solid #34415a;
   border-radius: 9px;
   background: #17243a;
+  color: #f5f5f5;
 }
 .combined-booking-child strong { overflow-wrap: anywhere; }
 .combined-wizard-progress { display: grid; gap: 8px; margin: 22px 0; }
