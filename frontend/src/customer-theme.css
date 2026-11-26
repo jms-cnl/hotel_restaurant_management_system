@@ -1849,6 +1849,40 @@
   .hotel-detail-heading, .restaurant-detail-heading { flex-direction: column; }
 }
 
+.customer-profile-page .profile-stats-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.customer-profile-page .profile-stat-card strong {
+  display: block;
+  color: #d9ad48;
+}
+
+.customer-profile-page .profile-notice[role="status"] {
+  margin: 12px 0;
+  color: #e7c579;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 900px) {
+  .customer-profile-page .profile-stats-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .customer-profile-page .profile-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin: 14px 0;
+  }
+
+  .customer-profile-page .profile-stat-card {
+    min-height: 78px;
+    padding: 12px;
+  }
+}
+
 .customer-hero {
   overflow: hidden;
   border: 1px solid #34415a;

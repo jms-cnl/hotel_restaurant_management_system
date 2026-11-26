@@ -13,6 +13,7 @@ import { RestaurantDiscovery } from "./components/RestaurantDiscovery";
 import { CustomerReservations } from "./components/CustomerReservations";
 import { CustomerCombinedBookings } from "./components/CustomerCombinedBookings";
 import { buildCombinedBookingPayload } from "./customerData";
+import { deriveCustomerProfileStats } from "./customerProfile";
 import { countCombinedBookings, loadCombinedBookingCount } from "./adminBookings";
 import { passwordErrors, passwordRequirements } from "./passwordPolicy";
 import { defaultStatusFor, statusOptionsFor, type CombinedBooking, type Hotel, type InventoryResourceKind, type Reservation, type ReservationHistory, type Restaurant, type RestaurantTable, type Room, type User } from "./types";
@@ -642,10 +643,22 @@ function Reports() {
 
 function Profile() {
     const { user, updateProfile } = useAuth(); const manager = isManager(user);
+    const [customerReservations, setCustomerReservations] = useState<Reservation[] | null>(null);
+    const [customerReservationsLoading, setCustomerReservationsLoading] = useState(true);
     const [form, setForm] = useState({ first_name: user?.first_name ?? "", last_name: user?.last_name ?? "", phone: user?.phone ?? "" });
     const [passwordForm, setPasswordForm] = useState({ current: "", next: "", confirm: "" });
     const [message, setMessage] = useState(""); const [error, setError] = useState("");
     const [activeTab, setActiveTab] = useState<"info" | "password">("info"); const [editingProfile, setEditingProfile] = useState(false);
+    useEffect(() => {
+        if (manager) return;
+        let active = true;
+        apiGet<Reservation[]>("/reservations")
+            .then(reservations => { if (active) setCustomerReservations(reservations); })
+            .catch(() => { if (active) setCustomerReservations(null); })
+            .finally(() => { if (active) setCustomerReservationsLoading(false); });
+        return () => { active = false; };
+    }, [manager]);
+    const profileStats = deriveCustomerProfileStats(customerReservations, new Date().toISOString().slice(0, 10));
     const submit = async (event: FormEvent) => { event.preventDefault(); setError(""); try { await updateProfile(form); setMessage("Profile updated"); setEditingProfile(false); } catch (e) { setError(e instanceof Error ? e.message : "Update failed"); } };
     const changePassword = async (event: FormEvent) => { event.preventDefault(); setError(""); setMessage(""); if (passwordErrors(passwordForm.next).length) { setError(`Password does not meet the requirements: ${passwordErrors(passwordForm.next).join(", ")}`); return; } if (passwordForm.next !== passwordForm.confirm) { setError("Password confirmation does not match"); return; } try { const result = await apiPost<{ message: string }>("/auth/change-password", { current_password: passwordForm.current, new_password: passwordForm.next }); setMessage(result.message); setPasswordForm({ current: "", next: "", confirm: "" }); } catch (e) { setError(e instanceof Error ? e.message : "Password change failed"); } };
     if (manager) return <main className="customer-profile-page">
@@ -690,7 +703,61 @@ function Profile() {
             </section>}
         </div>
     </main>;
-    return <Page title="Profile" error={error}>{message && <div className="alert success">{message}</div>}<form className="form-panel" onSubmit={submit}><h2>Profile details</h2><label>Email<input value={user?.email ?? ""} disabled /></label><label>First name<input required value={form.first_name} onChange={e => setForm({ ...form, first_name: e.target.value })} /></label><label>Last name<input required value={form.last_name} onChange={e => setForm({ ...form, last_name: e.target.value })} /></label><label>Phone<input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></label><button type="submit">Save profile</button></form><form className="form-panel password-form" onSubmit={changePassword}><h2>Change Password</h2><label>Current password<input type="password" required value={passwordForm.current} onChange={e => setPasswordForm({ ...passwordForm, current: e.target.value })} /></label><label>New password<input type="password" required value={passwordForm.next} onChange={e => setPasswordForm({ ...passwordForm, next: e.target.value })} /></label><PasswordRequirements password={passwordForm.next} /><label>Confirm new password<input type="password" required value={passwordForm.confirm} onChange={e => setPasswordForm({ ...passwordForm, confirm: e.target.value })} /></label><button type="submit">Change Password</button></form></Page>;
+    return <main className="customer-profile-page">
+        <div className="customer-profile-container">
+            <section className="profile-overview-card">
+                <div className="profile-avatar">{user?.first_name?.trim().charAt(0).toUpperCase() || "—"}</div>
+                <div className="profile-overview-info">
+                    <div className="profile-name-line"><h1>{`${user?.first_name ?? ""} ${user?.last_name ?? ""}`.trim()}</h1><span className="profile-role-badge">{role(user)}</span></div>
+                    <p className="profile-email">{user?.email}</p>
+                </div>
+            </section>
+            <section className="profile-stats-grid" aria-label="Booking statistics">
+                {([
+                    ["Total Bookings", profileStats?.totalBookings],
+                    ["Hotel Bookings", profileStats?.hotelBookings],
+                    ["Dining Reservations", profileStats?.diningBookings],
+                    ["Upcoming", profileStats?.upcomingBookings],
+                    ["Completed", profileStats?.completedBookings],
+                ] as const).map(([label, value]) => <article className="profile-stat-card" key={label}>
+                    <p>{label}</p><strong>{customerReservationsLoading ? "…" : value ?? "—"}</strong>
+                </article>)}
+            </section>
+            {error && <p className="profile-notice" role="alert">{error}</p>}
+            {!customerReservationsLoading && customerReservations === null && <p className="profile-notice" role="status">Unable to load booking statistics. Please try again later.</p>}
+            {message && <p className="profile-notice" role="status">{message}</p>}
+            <nav className="profile-tabs" aria-label="Profile sections">
+                <button type="button" className={activeTab === "info" ? "active" : ""} onClick={() => { setActiveTab("info"); setMessage(""); }}>Profile Info</button>
+                <button type="button" className={activeTab === "password" ? "active" : ""} onClick={() => { setActiveTab("password"); setMessage(""); }}>Change Password</button>
+            </nav>
+            {activeTab === "info" && <section className="profile-content-card">
+                <div className="profile-section-heading"><h2>Profile Information</h2><button type="button" className="profile-outline-button" onClick={() => { setEditingProfile(!editingProfile); setMessage(""); }}>{editingProfile ? "Cancel" : "Edit Profile"}</button></div>
+                {editingProfile ? <form className="profile-edit-form" onSubmit={submit}>
+                    <label>First Name<input value={form.first_name} onChange={event => setForm({ ...form, first_name: event.target.value })} required /></label>
+                    <label>Last Name<input value={form.last_name} onChange={event => setForm({ ...form, last_name: event.target.value })} required /></label>
+                    <label>Email Address<input type="email" value={user?.email ?? ""} disabled /></label>
+                    <label>Phone Number<input value={form.phone} onChange={event => setForm({ ...form, phone: event.target.value })} /></label>
+                    <button type="submit" className="profile-primary-button">Save Changes</button>
+                </form> : <div className="profile-information-grid">
+                    <div><span>Full Name</span><p>{`${user?.first_name ?? ""} ${user?.last_name ?? ""}`.trim()}</p></div>
+                    <div><span>Email Address</span><p>{user?.email}</p></div>
+                    <div><span>Phone Number</span><p>{user?.phone || "Not provided"}</p></div>
+                    <div><span>Account Type</span><p className="profile-muted-value">{role(user)}</p></div>
+                    <div><span>Account ID</span><p className="profile-muted-value">{user?.user_id}</p></div>
+                </div>}
+            </section>}
+            {activeTab === "password" && <section className="profile-content-card">
+                <div className="profile-section-heading"><h2>Change Password</h2></div>
+                <form className="profile-edit-form profile-password-form" onSubmit={changePassword}>
+                    <label>Current Password<input type="password" autoComplete="current-password" value={passwordForm.current} onChange={event => setPasswordForm({ ...passwordForm, current: event.target.value })} required /></label>
+                    <label>New Password<input type="password" autoComplete="new-password" value={passwordForm.next} onChange={event => setPasswordForm({ ...passwordForm, next: event.target.value })} required /></label>
+                    <PasswordRequirements password={passwordForm.next} />
+                    <label>Confirm New Password<input type="password" autoComplete="new-password" value={passwordForm.confirm} onChange={event => setPasswordForm({ ...passwordForm, confirm: event.target.value })} required /></label>
+                    <button type="submit" className="profile-primary-button">Update Password</button>
+                </form>
+            </section>}
+        </div>
+    </main>;
 }
 
 export function App() {
