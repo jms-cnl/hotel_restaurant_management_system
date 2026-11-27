@@ -3,6 +3,7 @@ import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, usePa
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut, bootstrapCsrfToken, clearCsrfToken, reportMeaningfulActivity } from "./api";
 import { authSession } from "./auth-session";
 import { useAuth } from "./auth";
+import { canCreateReservations, isAdmin, isManager, landingPath, role, userName } from "./appAccess";
 import { CustomerHome } from "./components/CustomerHome";
 import { CustomerLayout } from "./components/CustomerLayout";
 import { AdminLayout } from "./components/AdminLayout";
@@ -31,13 +32,6 @@ import { AdminSupportInbox } from "./components/AdminSupportInbox";
 import { StaffLayout } from "./components/StaffLayout";
 import { StaffDashboardPage } from "./components/StaffDashboardPage";
 import { staffRedirectForPath } from "./staffNavigation";
-
-const role = (user: User | null) => user?.role?.role_name ?? "Customer";
-const isManager = (user: User | null) => ["Admin", "Staff"].includes(role(user));
-const isAdmin = (user: User | null) => role(user) === "Admin";
-const userName = (user: User | null) => [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim() || user?.email || "Staff Member";
-const canCreateReservations = (user: User | null) => ["Customer", "Staff", "Admin"].includes(role(user));
-const landingPath = (user: User | null) => isManager(user) ? "/dashboard" : "/home";
 
 function Protected({ children }: { children: ReactNode }) {
     const { user, loading } = useAuth();
