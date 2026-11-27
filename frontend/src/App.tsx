@@ -4,7 +4,6 @@ import { apiDelete, apiGet, apiPatch, apiPost, apiPut, bootstrapCsrfToken, clear
 import { authSession } from "./auth-session";
 import { useAuth } from "./auth";
 import { canCreateReservations, isAdmin, isManager, landingPath, role, userName } from "./appAccess";
-import { CustomerHome } from "./components/CustomerHome";
 import { CustomerLayout } from "./components/CustomerLayout";
 import { AdminLayout } from "./components/AdminLayout";
 import { HotelDetails } from "./components/HotelDetails";
@@ -26,11 +25,11 @@ import { AdminPropertySettingsPage } from "./components/AdminPropertySettingsPag
 import { AdminAmenitiesPage } from "./components/AdminAmenitiesPage";
 import { AdminUsersPage } from "./components/AdminUsersPage";
 import { MediaManager } from "./components/MediaManager";
-import { AdminDashboard, AdminNotifications } from "./components/AdminPages";
+import { AdminNotifications } from "./components/AdminPages";
 import { AdminManage } from "./components/AdminManage";
 import { AdminSupportInbox } from "./components/AdminSupportInbox";
 import { StaffLayout } from "./components/StaffLayout";
-import { StaffDashboardPage } from "./components/StaffDashboardPage";
+import { Dashboard, Home, LandingRedirect } from "./components/AppRolePages";
 import { staffRedirectForPath } from "./staffNavigation";
 
 function Protected({ children }: { children: ReactNode }) {
@@ -98,16 +97,6 @@ function AuthPage({ registerMode = false }: { registerMode?: boolean }) {
         </div>
         <p className="auth-switch">{registerMode ? "Already registered? " : "Need an account? "}<Link to={registerMode ? "/login" : "/register"}>{registerMode ? "Sign in" : "Register"}</Link></p>
     </form></main>;
-}
-
-function Dashboard() {
-    const { user } = useAuth();
-    return isAdmin(user) ? <AdminDashboard /> : <StaffDashboardPage user={user} />;
-}
-
-function Home() {
-    const { user } = useAuth();
-    return isManager(user) ? <Navigate to="/dashboard" replace /> : <CustomerHome />;
 }
 
 function Properties() {
@@ -404,11 +393,6 @@ function ResetPassword() {
     }, [recoveryRole]);
     const submit = async (event: FormEvent) => { event.preventDefault(); setError(""); if (passwordErrors(newPassword).length) { setError(`Password does not meet the requirements: ${passwordErrors(newPassword).join(", ")}`); return; } if (newPassword !== confirmPassword) { setError("Password confirmation does not match"); return; } setLoading(true); try { const result = await apiPost<{ message: string }>("/auth/reset-password", { new_password: newPassword }); setMessage(result.message); } catch (e) { setError(e instanceof Error ? e.message : "Reset session is invalid or expired"); } finally { setLoading(false); } };
     return <main className="auth-page"><form className="auth-card" onSubmit={submit}><Link to="/login" className="auth-brand">StayEase</Link><p className="auth-eyebrow">ACCOUNT RECOVERY</p><h1>Set a new password</h1>{sessionWarning && <div className="alert error" role="status">Your recovery session will expire in two minutes. Save your work.</div>}{error && <div className="alert error" role="alert">{error}</div>}{message ? <><div className="alert success" role="status">{message}</div><button className="auth-button" type="button" onClick={() => navigate("/login")}>Back to login</button></> : <>{!loading && <div className="auth-form"><label>New password<input type="password" autoComplete="new-password" required value={newPassword} onChange={e => setNewPassword(e.target.value)} /></label><PasswordRequirements password={newPassword} /><label>Confirm password<input type="password" autoComplete="new-password" required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} /></label><button className="auth-button" disabled={loading} type="submit">Update password</button></div>}</>}</form></main>;
-}
-
-function LandingRedirect() {
-    const { user } = useAuth();
-    return <Navigate to={landingPath(user)} replace />;
 }
 
 type ResourceConfig = { title: string; endpoint: string; id: string; fields: string[]; search?: string };
