@@ -61,6 +61,11 @@ export class UsersAndStaffAssignmentsTab extends AdminRouteTab {
     readonly path = "/users";
 }
 
+export class SupportTab extends AdminRouteTab {
+    readonly label = "Support";
+    readonly path = "/support-inbox";
+}
+
 export class ReportsTab extends AdminRouteTab {
     readonly label = "Reports";
     readonly path = "/reports";
@@ -81,6 +86,7 @@ export const adminTabs: AdminTab[] = [
     new TablesTab(),
     new AmenitiesTab(),
     new UsersAndStaffAssignmentsTab(),
+    new SupportTab(),
     new ReportsTab(),
     new NotificationsTab(),
 ];
