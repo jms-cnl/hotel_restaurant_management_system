@@ -17,6 +17,7 @@ import { createCorsMiddleware, parseAllowedOrigins } from "./middleware/cors.mid
 import { noStoreApiResponses } from "./middleware/api-cache.middleware.js";
 import adminUserRouter from "./routes/admin-user.routes.js";
 import amenityRouter from "./routes/amenity.routes.js";
+import supportMessageRouter from "./routes/support-message.routes.js";
 
 
 const app = express();
@@ -29,6 +30,7 @@ app.use(express.json());
 app.use("/api/auth", authRouter);
 app.use("/api/admin/users", adminUserRouter);
 app.use("/api/amenities", amenityRouter);
+app.use("/api/support-messages", supportMessageRouter);
 app.use("/api/users", userRouter);
 app.use("/api/hotels", hotelRouter);
 app.use("/api/restaurants", restaurantRouter);
