@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiDelete, apiGet } from "../api";
 import { canCancelCombinedBooking, canCancelReservation, collectionState, combinedVenueLabel, countWhenAvailable, filterReservations } from "../customerData";
-import { countUpcomingBookings, getTodayInManila } from "../reservationStats";
+import { countCustomerBookingStats, countUpcomingBookings, getTodayInManila } from "../reservationStats";
 import { formatReservationTime } from "../bookingTime";
 import type { CombinedBooking, Reservation, RestaurantTable, Room } from "../types";
 
@@ -69,8 +69,9 @@ export function CustomerReservations() {
     const standaloneItems = useMemo(() => items.filter((item) => item.combined_booking_id == null), [items]);
     const visibleReservations = useMemo(() => filterReservations(standaloneItems, category, status), [standaloneItems, category, status]);
     const visibleCombined = useMemo(() => combinedItems.filter((item) => status === "all" || item.status === status), [combinedItems, status]);
-    const hotelCount = standaloneItems.filter((item) => item.reservation_type === "HOTEL").length;
-    const diningCount = standaloneItems.filter((item) => item.reservation_type === "RESTAURANT").length;
+    const bookingCounts = countCustomerBookingStats(items, combinedItems);
+    const hotelCount = bookingCounts.hotelBookings;
+    const diningCount = bookingCounts.diningBookings;
     const upcomingCount = countUpcomingBookings(items, combinedItems, getTodayInManila());
 
     const cancelReservation = async (reservation: Reservation) => {
@@ -110,7 +111,7 @@ export function CustomerReservations() {
         <div className="reservation-stats">
             <div className="stat-card"><span>Hotel Bookings</span><strong>{countWhenAvailable(hotelCount, loading, Boolean(reservationsLoadError)) ?? "—"}</strong></div>
             <div className="stat-card"><span>Dining Reservations</span><strong>{countWhenAvailable(diningCount, loading, Boolean(reservationsLoadError)) ?? "—"}</strong></div>
-            <div className="stat-card"><span>Combined Stays</span><strong>{countWhenAvailable(combinedItems.length, loading, Boolean(combinedError)) ?? "—"}</strong></div>
+            <div className="stat-card"><span>Combined Stays</span><strong>{countWhenAvailable(bookingCounts.combinedBookings, loading, Boolean(combinedError)) ?? "—"}</strong></div>
             <div className="stat-card"><span>Upcoming</span><strong className="upcoming-number">{countWhenAvailable(upcomingCount, loading, Boolean(reservationsLoadError), Boolean(combinedError)) ?? "—"}</strong></div>
         </div>
         {error && <div className="alert error customer-alert" role="alert">{error}</div>}

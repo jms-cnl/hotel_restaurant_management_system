@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { deriveCustomerProfileStats } from "../src/customerProfile.ts";
-import type { Reservation } from "../src/types.ts";
+import { countCustomerBookingStats } from "../src/reservationStats.ts";
+import type { CombinedBooking, Reservation } from "../src/types.ts";
 
 const reservation = (overrides: Partial<Reservation>): Reservation => ({
     reservation_id: 1,
@@ -13,7 +14,7 @@ const reservation = (overrides: Partial<Reservation>): Reservation => ({
 });
 
 test("empty reservation data produces zeroed profile statistics", () => {
-    assert.deepEqual(deriveCustomerProfileStats([], 0), {
+    assert.deepEqual(deriveCustomerProfileStats([], countCustomerBookingStats([], []), 0), {
         totalBookings: 0,
         hotelBookings: 0,
         diningBookings: 0,
@@ -29,7 +30,7 @@ test("profile statistics count upcoming and completed reservations", () => {
         reservation({ reservation_id: 3, status: "Pending", check_in_date: "2026-11-20" }),
     ];
 
-    assert.deepEqual(deriveCustomerProfileStats(reservations, 1), {
+    assert.deepEqual(deriveCustomerProfileStats(reservations, countCustomerBookingStats(reservations, []), 1), {
         totalBookings: 3,
         hotelBookings: 3,
         diningBookings: 0,
@@ -38,25 +39,33 @@ test("profile statistics count upcoming and completed reservations", () => {
     });
 });
 
-test("combined child reservations count once overall and once in each matching category", () => {
+test("combined children are excluded from profile categories while combined bookings count once", () => {
     const reservations = [
         reservation({ reservation_id: 10, reservation_type: "HOTEL", combined_booking_id: 7, status: "Confirmed", check_in_date: "2026-12-03" }),
         reservation({ reservation_id: 11, reservation_type: "RESTAURANT", combined_booking_id: 7, status: "Confirmed", reservation_date: "2026-12-03" }),
         reservation({ reservation_id: 12, reservation_type: "RESTAURANT", status: "Pending", reservation_date: "2026-12-05" }),
     ];
+    const combinedBookings: CombinedBooking[] = [{
+        combined_booking_id: 7,
+        user_id: "customer-1",
+        status: "Confirmed",
+        created_at: "2026-11-01T00:00:00Z",
+        reservation: reservations.slice(0, 2),
+    }];
 
-    assert.deepEqual(deriveCustomerProfileStats(reservations, 2), {
+    assert.deepEqual(deriveCustomerProfileStats(reservations, countCustomerBookingStats(reservations, combinedBookings), 2), {
         totalBookings: 2,
-        hotelBookings: 1,
-        diningBookings: 2,
+        hotelBookings: 0,
+        diningBookings: 1,
         upcomingBookings: 2,
         completedBookings: 0,
     });
 });
 
 test("unavailable reservation data is distinct from an empty history", () => {
-    assert.equal(deriveCustomerProfileStats(null, 0), null);
-    assert.equal(deriveCustomerProfileStats([], null), null);
+    assert.equal(deriveCustomerProfileStats(null, countCustomerBookingStats([], []), 0), null);
+    assert.equal(deriveCustomerProfileStats([], null, 0), null);
+    assert.equal(deriveCustomerProfileStats([], countCustomerBookingStats([], []), null), null);
 });
 
 test("customer profile has tabs, booking statistics, and preserves profile APIs and manager tabs", async () => {
