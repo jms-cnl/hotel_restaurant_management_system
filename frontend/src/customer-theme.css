@@ -2338,6 +2338,22 @@
   color: #f4f1e9;
 }
 
+.customer-support-page { max-width: 720px; margin: 0 auto; padding: 24px 0 48px; }
+.customer-support-heading { margin-bottom: 22px; }
+.customer-support-heading .eyebrow { margin: 0 0 8px; color: #d9ad48; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.14em; }
+.customer-support-heading h1 { margin: 0; color: #f5f0e8; font-family: Georgia, serif; font-size: clamp(1.6rem, 4vw, 2.2rem); }
+.customer-support-heading > p:last-child { margin: 8px 0 0; color: #9aafc4; }
+.customer-support-form { display: grid; gap: 10px; padding: 26px; border: 1px solid #2b3b4d; border-radius: 11px; background: #202e40; }
+.customer-support-form label { margin-top: 8px; color: #bdc7d2; font-size: 0.82rem; font-weight: 600; }
+.customer-support-form input, .customer-support-form textarea { width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #39495a; border-radius: 7px; background: #111a28; color: #f5f0e8; font: inherit; }
+.customer-support-form textarea { min-height: 160px; resize: vertical; }
+.customer-support-form input:focus-visible, .customer-support-form textarea:focus-visible { border-color: #d9ad48; outline: 2px solid #d9ad4866; outline-offset: 1px; }
+.customer-support-field-error, .customer-support-error { margin: 0; color: #ffb5bd; font-size: 0.82rem; }
+.customer-support-success { margin: 6px 0; color: #8dd4b2; font-size: 0.86rem; }
+.customer-support-submit { justify-self: start; min-height: 44px; margin-top: 8px; padding: 10px 18px; border: 0; border-radius: 6px; background: #d9ad48; color: #101827; font-size: 0.82rem; font-weight: 700; cursor: pointer; }
+.customer-support-submit:disabled { opacity: 0.6; cursor: wait; }
+.customer-support-submit:focus-visible { outline: 2px solid #f5f0e8; outline-offset: 3px; }
+
 .customer-profile-container {
   width: 100%;
   max-width: 900px;
@@ -2689,6 +2705,8 @@
 }
 
 @media (max-width: 700px) {
+  .customer-support-page { padding: 10px 0 32px; }
+  .customer-support-form { padding: 20px; }
   .customer-profile-page {
     padding: 24px 14px 48px;
   }
