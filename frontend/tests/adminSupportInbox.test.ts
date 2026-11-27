@@ -15,8 +15,8 @@ const { AdminSupportInbox } = componentModule;
 test.after(async () => { await vite.close(); });
 
 const messages = [
-    { support_message_id: 8, customer_id: "customer-8", subject: "Refund question", message: "Please check my refund.", status: "open", created_at: "2026-11-25T08:30:00.000Z" },
-    { support_message_id: 7, customer_id: "customer-7", subject: "Booking change", message: "I need to change dates.", status: "resolved", created_at: "2026-11-24T08:30:00.000Z" },
+    { support_message_id: 8, customer_id: "customer-8", customer: { first_name: "Ada", last_name: "Lovelace", email: "ada@example.test" }, subject: "Refund question", message: "Please check my refund.", status: "open", created_at: "2026-11-25T08:30:00.000Z" },
+    { support_message_id: 7, customer_id: "customer-7", customer: { first_name: "Grace", last_name: "Hopper", email: "grace@example.test" }, subject: "Booking change", message: "I need to change dates.", status: "resolved", created_at: "2026-11-24T08:30:00.000Z" },
 ];
 
 test("Admin can load and see the support inbox list", async () => {
@@ -27,7 +27,8 @@ test("Admin can load and see the support inbox list", async () => {
     assert.deepEqual(calls, ["/support-messages"]);
     const markup = renderToStaticMarkup(createElement(AdminSupportInbox, { model: inbox }));
     assert.match(markup, /Refund question/);
-    assert.match(markup, /customer-8/);
+    assert.match(markup, /Ada Lovelace \(ada@example\.test\)/);
+    assert.doesNotMatch(markup, /customer-8/);
     assert.match(markup, /open/);
     assert.match(markup, /Booking change/);
     assert.match(markup, /2026/);
@@ -82,9 +83,22 @@ test("selected support message detail shows its full subject, message, customer,
     const markup = renderToStaticMarkup(createElement(AdminSupportInbox, { model: inbox }));
     assert.match(markup, /Refund question/);
     assert.match(markup, /Please check my refund\./);
-    assert.match(markup, /customer-8/);
+    assert.match(markup, /Ada Lovelace \(ada@example\.test\)/);
+    assert.doesNotMatch(markup, /customer-8/);
     assert.match(markup, /open/);
     assert.match(markup, /November|2026/);
+});
+
+test("Admin inbox falls back to customer_id when name or email is missing", async () => {
+    const inbox = createAdminSupportInboxModel("Admin", async () => [{
+        ...messages[0],
+        customer: { first_name: "Ada", last_name: "", email: "" },
+    }]);
+    assert.ok(inbox);
+    await inbox.load();
+    const markup = renderToStaticMarkup(createElement(AdminSupportInbox, { model: inbox }));
+    assert.match(markup, /customer-8/);
+    assert.doesNotMatch(markup, /Ada \(/);
 });
 
 test("resolving an open message sends PATCH and updates selected detail and list status", async () => {

@@ -46,6 +46,7 @@ const validateInput = (input: unknown): SupportMessageInput => {
 };
 
 const messageFields = "support_message_id, customer_id, subject, message, status, created_at, updated_at";
+const adminMessageFields = `${messageFields}, customer:user!support_message_customer_id_fkey(first_name,last_name,email)`;
 const createSupportMessageSubject = (req: Request) => {
     const subject = new SupportMessageSubject();
     subject.attach(new SupportMessageHistoryObserver(req));
@@ -89,14 +90,14 @@ const throwOnMessageQueryError = (error: { code?: string } | null, notFound = fa
 };
 export const listSupportMessages = async (req: Request) => {
     const { data, error } = await getRequestSupabase(req).from("support_message")
-        .select(messageFields).order("created_at", { ascending: false });
+        .select(adminMessageFields).order("created_at", { ascending: false });
     throwOnMessageQueryError(error);
     return data ?? [];
 };
 export const getSupportMessage = async (req: Request, id: string) => {
     const messageId = parseSupportMessageId(id);
     const { data, error } = await getRequestSupabase(req).from("support_message")
-        .select(messageFields).eq("support_message_id", messageId).single();
+        .select(adminMessageFields).eq("support_message_id", messageId).single();
     throwOnMessageQueryError(error, true);
     if (!data) throw new SupportMessageError("Support message not found", 404);
     return data;
@@ -105,7 +106,7 @@ export const updateSupportMessageStatus = async (req: Request, id: string, statu
     const messageId = parseSupportMessageId(id);
     if (status !== "open" && status !== "resolved") throw new SupportMessageError("Status must be open or resolved");
     const client = getRequestSupabase(req);
-    const current = await client.from("support_message").select(messageFields)
+    const current = await client.from("support_message").select(adminMessageFields)
         .eq("support_message_id", messageId).single();
     throwOnMessageQueryError(current.error, true);
     if (!current.data) throw new SupportMessageError("Support message not found", 404);
@@ -114,7 +115,7 @@ export const updateSupportMessageStatus = async (req: Request, id: string, statu
         status,
         updated_at: new Date().toISOString(),
     }).eq("support_message_id", messageId).eq("status", current.data.status)
-        .select(messageFields).single();
+        .select(adminMessageFields).single();
     throwOnMessageQueryError(error, true);
     if (!data) throw new SupportMessageError("Support message not found", 404);
 
