@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -30,6 +31,21 @@ test("Admin can load and see the support inbox list", async () => {
     assert.match(markup, /open/);
     assert.match(markup, /Booking change/);
     assert.match(markup, /2026/);
+});
+
+test("long unbroken subjects keep all inbox columns available and preserve the full subject", async () => {
+    const longSubject = "S".repeat(400);
+    const inbox = createAdminSupportInboxModel("Admin", async () => [{ ...messages[0], subject: longSubject }]);
+    assert.ok(inbox);
+    await inbox.load();
+    const markup = renderToStaticMarkup(createElement(AdminSupportInbox, { model: inbox }));
+    for (const heading of ["Subject", "Customer", "Status", "Created"]) assert.match(markup, new RegExp(`<th>${heading}</th>`));
+    assert.match(markup, new RegExp(longSubject));
+
+    const styles = await readFile(new URL("../src/admin-theme.css", import.meta.url), "utf8");
+    assert.match(styles, /\.support-inbox-list\s+\.admin-crud-table\s*\{[^}]*table-layout:\s*fixed/s);
+    assert.match(styles, /\.support-inbox-subject\s*\{[^}]*overflow-wrap:\s*anywhere/s);
+    assert.match(styles, /\.support-inbox-list\s+\.admin-crud-table-wrap\s*\{[^}]*scrollbar-color:/s);
 });
 
 test("Customer and Staff are redirected away from the support inbox", () => {
