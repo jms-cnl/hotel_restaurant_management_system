@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut, bootstrapCsrfToken, clearCsrfToken, reportMeaningfulActivity } from "./api";
 import { authSession } from "./auth-session";
@@ -17,7 +17,6 @@ import { buildCombinedBookingPayload } from "./customerData";
 import { deriveCustomerProfileStats } from "./customerProfile";
 import { countCustomerBookingStats, countUpcomingBookings, getTodayInManila } from "./reservationStats";
 import { countCombinedBookings, loadCombinedBookingCount } from "./adminBookings";
-import { formatAdminCombinedBookingDateTime } from "./bookingTime";
 import { passwordErrors, passwordRequirements } from "./passwordPolicy";
 import { defaultStatusFor, statusOptionsFor, type CombinedBooking, type Hotel, type InventoryResourceKind, type Reservation, type ReservationHistory, type Restaurant, type RestaurantTable, type Room, type User } from "./types";
 import { AdminInventoryPage } from "./components/AdminInventoryPage";
@@ -28,6 +27,8 @@ import { MediaManager } from "./components/MediaManager";
 import { AdminNotifications } from "./components/AdminPages";
 import { AdminManage } from "./components/AdminManage";
 import { AdminSupportInbox } from "./components/AdminSupportInbox";
+import { CombinedBookings, Reports } from "./components/BookingDisplayPages";
+import { Page } from "./components/Page";
 import { StaffLayout } from "./components/StaffLayout";
 import { Dashboard, Home, LandingRedirect } from "./components/AppRolePages";
 import { staffRedirectForPath } from "./staffNavigation";
@@ -56,10 +57,6 @@ function StaffPropertyRedirect({ children }: { children: ReactNode }) {
     const location = useLocation();
     const redirectTo = role(user) === "Staff" ? staffRedirectForPath(location.pathname) : null;
     return redirectTo ? <Navigate to={redirectTo} replace /> : <>{children}</>;
-}
-
-function Page({ title, children, error, loading }: { title: string; children: ReactNode; error?: string; loading?: boolean }) {
-    return <section><div className="page-heading"><h1>{title}</h1></div>{error && <div className="alert error">{error}</div>}{loading ? <p>Loading...</p> : children}</section>;
 }
 
 function PasswordRequirements({ password }: { password: string }) {
@@ -616,33 +613,6 @@ function Reservations({ manageView = false }: { manageView?: boolean } = {}) {
         <form hidden={!canCreateReservations(user)} className="form-panel reservation-form" onSubmit={submit}><h2>New reservation</h2><label>Type<select value={type} onChange={e => setType(e.target.value)}><option>HOTEL</option><option>RESTAURANT</option></select></label>{type === "HOTEL" ? <label>Room<select required value={form.room_id ?? ""} onChange={e => setForm({ ...form, room_id: e.target.value })}><option value="">Select room</option>{rooms.map(room => <option key={room.room_id} value={room.room_id}>{room.room_number} ({room.status})</option>)}</select></label> : <label>Table<select required value={form.table_id ?? ""} onChange={e => setForm({ ...form, table_id: e.target.value })}><option value="">Select table</option>{tables.map(table => <option key={table.table_id} value={table.table_id}>{table.table_number} ({table.status})</option>)}</select></label>}{type === "HOTEL" ? <><label>Check in<input required type="date" value={form.check_in_date ?? ""} onChange={e => setForm({ ...form, check_in_date: e.target.value })} /></label><label>Check out<input required type="date" value={form.check_out_date ?? ""} onChange={e => setForm({ ...form, check_out_date: e.target.value })} /></label></> : <><label>Date<input required type="date" value={form.reservation_date ?? ""} onChange={e => setForm({ ...form, reservation_date: e.target.value })} /></label><label>Start<input required type="time" value={form.start_time ?? ""} onChange={e => setForm({ ...form, start_time: e.target.value })} /></label><label>End<input required type="time" value={form.end_time ?? ""} onChange={e => setForm({ ...form, end_time: e.target.value })} /></label></>}<label>Special request<textarea value={form.special_request ?? ""} onChange={e => setForm({ ...form, special_request: e.target.value })} /></label><button type="submit">Create reservation</button></form>
         {selected && <div className="detail"><h2>Reservation {selected.reservation_id}</h2><p>Status: {selected.status}</p><h3>Status history</h3>{history.length ? <ul>{history.map(entry => <li key={entry.history_id}>{entry.status} at {entry.changed_at}: {entry.remarks ?? ""}</li>)}</ul> : <p>No history.</p>}<button onClick={() => setSelected(null)}>Close</button></div>}
     </>;
-}
-
-function CombinedBookings() {
-    const { user } = useAuth(); const manager = isManager(user); const [items, setItems] = useState<CombinedBooking[]>([]); const [rooms, setRooms] = useState<Room[]>([]); const [tables, setTables] = useState<RestaurantTable[]>([]); const [error, setError] = useState(''); const [loading, setLoading] = useState(true);
-    const load = () => { setLoading(true); apiGet<CombinedBooking[]>('/combined-bookings').then(setItems).catch(e => setError(e.message)).finally(() => setLoading(false)); };
-    useEffect(() => { load(); apiGet<Room[]>('/rooms').then(setRooms).catch(() => undefined); apiGet<RestaurantTable[]>('/tables').then(setTables).catch(() => undefined); }, []);
-    const status = async (item: CombinedBooking, next: string) => { try { await apiPatch(`/combined-bookings/${item.combined_booking_id}/status`, { status: next }); load(); } catch (e) { setError(e instanceof Error ? e.message : 'Status update failed'); } };
-    return <section className="listing-section staff-manage-page"><p className="eyebrow">{isAdmin(user) ? "ADMIN WORKSPACE" : "STAFF WORKSPACE"}</p><h1>Combined Bookings</h1>{error && <div className="alert error">{error}</div>}<div className="staff-table-wrap"><table className="staff-reservations-table"><thead><tr><th>Reservation</th><th>Guest</th><th>Property / Booking</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead><tbody>{items.map(item => {
-        const hotelReservation = item.reservation?.find(reservation => reservation.room_id != null);
-        const diningReservation = item.reservation?.find(reservation => reservation.table_id != null);
-        const room = rooms.find(candidate => candidate.room_id === hotelReservation?.room_id) ?? hotelReservation?.room;
-        const table = tables.find(candidate => candidate.table_id === diningReservation?.table_id) ?? diningReservation?.restaurant_table;
-        const count = item.reservation?.length ?? 0;
-        const diningDateTime = hotelReservation
-            ? formatAdminCombinedBookingDateTime(diningReservation?.reservation_date, diningReservation?.start_time, diningReservation?.end_time)
-            : null;
-        return <tr key={item.combined_booking_id}><td><strong>#{item.combined_booking_id}</strong><small>{count} {count === 1 ? 'reservation' : 'reservations'}</small>{item.created_at && <small>Created {item.created_at.slice(0, 10)}</small>}</td><td>{item.user ? `${item.user.first_name} ${item.user.last_name}`.trim() || item.user.email : '—'}</td><td><strong>{room?.hotel?.name ?? (room ? `Hotel #${room.hotel_id}` : '—')}{table?.restaurant?.name ? ` + ${table.restaurant.name}` : ''}</strong><small>{room ? `Room ${room.room_number}` : '—'}{table ? ` · Table ${table.table_number}` : ''}</small></td><td>{hotelReservation?.check_in_date ?? diningReservation?.reservation_date ?? '—'}{hotelReservation?.check_out_date && <small>Until {hotelReservation.check_out_date.slice(0, 10)}</small>}{diningDateTime && <small>{diningDateTime}</small>}</td><td><span className={`reservation-status ${item.status.toLowerCase()}`}>{item.status}</span></td><td><div className="staff-table-actions">{manager && item.status === 'Pending' && <button type="button" onClick={() => status(item, 'Confirmed')}>Confirm</button>}{manager && item.status === 'Confirmed' && <button type="button" onClick={() => status(item, 'Completed')}>Complete</button>}</div></td></tr>;
-    })}{loading ? <tr><td colSpan={6} className="staff-empty-state">Loading combined bookings...</td></tr> : items.length === 0 && <tr><td colSpan={6} className="staff-empty-state">No combined bookings found.</td></tr>}</tbody></table></div></section>;
-}
-function Reports() {
-    const [report, setReport] = useState("reservations"); const [filters, setFilters] = useState({ date_from: "", date_to: "", status: "", type: "", hotel_id: "", restaurant_id: "", room_id: "", table_id: "" });
-    const [data, setData] = useState<Record<string, unknown> | null>(null); const [error, setError] = useState(""); const [loading, setLoading] = useState(true);
-    const load = async () => { setLoading(true); setError(""); const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value)); try { setData(await apiGet<Record<string, unknown>>(`/reports/${report}${query.toString() ? `?${query}` : ""}`)); } catch (e) { setError(e instanceof Error ? e.message : "Unable to load report"); } finally { setLoading(false); } };
-    useEffect(() => { void load(); }, []);
-    const update = (key: keyof typeof filters, value: string) => setFilters({ ...filters, [key]: value });
-    const hasNoRows = Boolean(data && ["reservations", "revenue", "tables"].includes(report) && Array.isArray(data.reservations) && data.reservations.length === 0);
-    return <Page title="Reports" error={error} loading={loading}><form className="toolbar" onSubmit={event => { event.preventDefault(); void load(); }}><label>Report<select value={report} onChange={e => setReport(e.target.value)}><option value="reservations">Reservation summary/status</option><option value="revenue">Revenue</option><option value="occupancy">Room occupancy</option><option value="tables">Table reservations</option></select></label><label>From<input type="date" value={filters.date_from} onChange={e => update("date_from", e.target.value)} /></label><label>To<input type="date" value={filters.date_to} onChange={e => update("date_to", e.target.value)} /></label><label>Status<select value={filters.status} onChange={e => update("status", e.target.value)}><option value="">All statuses</option>{["Pending", "Confirmed", "Rejected", "Completed", "Cancelled"].map(status => <option key={status}>{status}</option>)}</select></label><label>Type<select value={filters.type} onChange={e => update("type", e.target.value)}><option value="">All types</option><option>HOTEL</option><option>RESTAURANT</option></select></label><label>Hotel ID<input inputMode="numeric" value={filters.hotel_id} onChange={e => update("hotel_id", e.target.value)} /></label><label>Restaurant ID<input inputMode="numeric" value={filters.restaurant_id} onChange={e => update("restaurant_id", e.target.value)} /></label><label>Room ID<input inputMode="numeric" value={filters.room_id} onChange={e => update("room_id", e.target.value)} /></label><label>Table ID<input inputMode="numeric" value={filters.table_id} onChange={e => update("table_id", e.target.value)} /></label><button type="submit">Load report</button></form>{hasNoRows ? <p className="empty">No matching records.</p> : data ? <div className="report-block"><h2>{report}</h2><pre>{JSON.stringify(data, null, 2)}</pre></div> : <p className="empty">No report data.</p>}</Page>;
 }
 
 function Profile() {
