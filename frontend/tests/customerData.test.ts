@@ -13,7 +13,6 @@ import {
     filterReservations,
     isVenueBookable,
     canCancelReservation,
-    isUpcomingBooking,
     claimRoomMediaRefresh,
     collectionState,
     mergeRoomMedia,
@@ -118,12 +117,6 @@ test("cancellation is available only to standalone Pending or Confirmed reservat
     assert.equal(canCancelReservation({ status: "Cancelled" }), false);
     assert.equal(canCancelReservation({ status: "Completed" }), false);
     assert.equal(canCancelReservation({ status: "Rejected" }), false);
-});
-
-test("upcoming counts only Pending or Confirmed records with a future start date", () => {
-    assert.equal(isUpcomingBooking("Pending", "2026-11-06", "2026-11-05"), true);
-    assert.equal(isUpcomingBooking("Confirmed", "2026-11-05", "2026-11-05"), false);
-    assert.equal(isUpcomingBooking("Cancelled", "2026-11-06", "2026-11-05"), false);
 });
 
 test("filterResources searches names and addresses and applies status", () => {

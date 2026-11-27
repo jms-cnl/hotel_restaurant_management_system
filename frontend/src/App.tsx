@@ -15,6 +15,7 @@ import { CustomerCombinedBookings } from "./components/CustomerCombinedBookings"
 import { CustomerSupportForm } from "./components/CustomerSupportForm";
 import { buildCombinedBookingPayload } from "./customerData";
 import { deriveCustomerProfileStats } from "./customerProfile";
+import { countUpcomingBookings, getTodayInManila } from "./reservationStats";
 import { countCombinedBookings, loadCombinedBookingCount } from "./adminBookings";
 import { passwordErrors, passwordRequirements } from "./passwordPolicy";
 import { defaultStatusFor, statusOptionsFor, type CombinedBooking, type Hotel, type InventoryResourceKind, type Reservation, type ReservationHistory, type Restaurant, type RestaurantTable, type Room, type User } from "./types";
@@ -502,12 +503,7 @@ function Reservations({ manageView = false }: { manageView?: boolean } = {}) {
     const combinedStatus = async (item: CombinedBooking, next: string) => { try { await apiPatch(`/combined-bookings/${item.combined_booking_id}/status`, { status: next }); setMessage("Status updated"); loadCombined(); } catch (e) { setError(e instanceof Error ? e.message : "Status update failed"); } };
     const hotelCount = items.filter(item => item.reservation_type === "HOTEL").length;
     const diningCount = items.filter(item => item.reservation_type === "RESTAURANT").length;
-    const today = new Date().toISOString().slice(0, 10);
-    const isUpcoming = (item: Reservation) => {
-        const date = item.reservation_type === "HOTEL" ? item.check_in_date : item.reservation_date;
-        return (item.status === "Pending" || item.status === "Confirmed") && Boolean(date && date.slice(0, 10) >= today);
-    };
-    const upcomingCount = items.filter(item => !item.combined_booking_id && isUpcoming(item)).length + combinedItems.filter(item => (item.status === "Pending" || item.status === "Confirmed") && item.reservation?.some(reservation => { const date = reservation.check_in_date ?? reservation.reservation_date; return Boolean(date && date.slice(0, 10) >= today); })).length;
+    const upcomingCount = countUpcomingBookings(items, combinedItems, getTodayInManila());
     const displayed = items.filter(item => item.reservation_type === (category === "Dining" ? "RESTAURANT" : "HOTEL"));
     const displayedCombined = combinedItems.filter(item => !statusFilter || item.status === statusFilter);
     const managedItems = items.filter(item => {
@@ -670,6 +666,7 @@ function Reports() {
 function Profile() {
     const { user, updateProfile } = useAuth(); const manager = isManager(user);
     const [customerReservations, setCustomerReservations] = useState<Reservation[] | null>(null);
+    const [customerCombinedBookings, setCustomerCombinedBookings] = useState<CombinedBooking[] | null>(null);
     const [customerReservationsLoading, setCustomerReservationsLoading] = useState(true);
     const [form, setForm] = useState({ first_name: user?.first_name ?? "", last_name: user?.last_name ?? "", phone: user?.phone ?? "" });
     const [passwordForm, setPasswordForm] = useState({ current: "", next: "", confirm: "" });
@@ -703,13 +700,19 @@ function Profile() {
     useEffect(() => {
         if (manager) return;
         let active = true;
-        apiGet<Reservation[]>("/reservations")
-            .then(reservations => { if (active) setCustomerReservations(reservations); })
-            .catch(() => { if (active) setCustomerReservations(null); })
+        Promise.allSettled([apiGet<Reservation[]>("/reservations"), apiGet<CombinedBooking[]>("/combined-bookings")])
+            .then(([reservations, combinedBookings]) => {
+                if (!active) return;
+                setCustomerReservations(reservations.status === "fulfilled" ? reservations.value : null);
+                setCustomerCombinedBookings(combinedBookings.status === "fulfilled" ? combinedBookings.value : null);
+            })
             .finally(() => { if (active) setCustomerReservationsLoading(false); });
         return () => { active = false; };
     }, [manager]);
-    const profileStats = deriveCustomerProfileStats(customerReservations, new Date().toISOString().slice(0, 10));
+    const profileUpcomingCount = customerReservations && customerCombinedBookings
+        ? countUpcomingBookings(customerReservations, customerCombinedBookings, getTodayInManila())
+        : null;
+    const profileStats = deriveCustomerProfileStats(customerReservations, profileUpcomingCount);
     const submit = async (event: FormEvent) => { event.preventDefault(); setError(""); try { await updateProfile(form); setMessage("Profile updated"); setEditingProfile(false); } catch (e) { setError(e instanceof Error ? e.message : "Update failed"); } };
     const changePassword = async (event: FormEvent) => { event.preventDefault(); setError(""); setMessage(""); if (passwordErrors(passwordForm.next).length) { setError(`Password does not meet the requirements: ${passwordErrors(passwordForm.next).join(", ")}`); return; } if (passwordForm.next !== passwordForm.confirm) { setError("Password confirmation does not match"); return; } try { const result = await apiPost<{ message: string }>("/auth/change-password", { current_password: passwordForm.current, new_password: passwordForm.next }); setMessage(result.message); setPasswordForm({ current: "", next: "", confirm: "" }); } catch (e) { setError(e instanceof Error ? e.message : "Password change failed"); } };
     const changeCustomerPassword = async (event: FormEvent) => { event.preventDefault(); setError(""); setMessage(""); if (passwordErrors(passwordForm.next).length) { setError(`Password does not meet the requirements: ${passwordErrors(passwordForm.next).join(", ")}`); return; } if (passwordForm.next !== passwordForm.confirm) { setError("Password confirmation does not match"); return; } try { const result = await customerPasswordRequest(); setMessage(result.message); setPasswordForm({ current: "", next: "", confirm: "" }); } catch (e) { setError(e instanceof Error ? e.message : "Password change failed"); } };
@@ -775,7 +778,7 @@ function Profile() {
                     <p>{label}</p><strong>{customerReservationsLoading ? "…" : value ?? "—"}</strong>
                 </article>)}
             </section>
-            {!customerReservationsLoading && customerReservations === null && <p className="profile-notice" role="status">Unable to load booking statistics. Please try again later.</p>}
+            {!customerReservationsLoading && profileStats === null && <p className="profile-notice" role="status">Unable to load booking statistics. Please try again later.</p>}
             <nav className="profile-tabs" aria-label="Profile sections">
                 <button type="button" className={activeTab === "info" ? "active" : ""} onClick={() => { setActiveTab("info"); setMessage(""); }}>Profile Info</button>
                 <button type="button" className={activeTab === "password" ? "active" : ""} onClick={() => { setActiveTab("password"); setMessage(""); }}>Change Password</button>

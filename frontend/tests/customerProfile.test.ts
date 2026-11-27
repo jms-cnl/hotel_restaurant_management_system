@@ -13,7 +13,7 @@ const reservation = (overrides: Partial<Reservation>): Reservation => ({
 });
 
 test("empty reservation data produces zeroed profile statistics", () => {
-    assert.deepEqual(deriveCustomerProfileStats([], "2026-11-26"), {
+    assert.deepEqual(deriveCustomerProfileStats([], 0), {
         totalBookings: 0,
         hotelBookings: 0,
         diningBookings: 0,
@@ -29,7 +29,7 @@ test("profile statistics count upcoming and completed reservations", () => {
         reservation({ reservation_id: 3, status: "Pending", check_in_date: "2026-11-20" }),
     ];
 
-    assert.deepEqual(deriveCustomerProfileStats(reservations, "2026-11-26"), {
+    assert.deepEqual(deriveCustomerProfileStats(reservations, 1), {
         totalBookings: 3,
         hotelBookings: 3,
         diningBookings: 0,
@@ -45,7 +45,7 @@ test("combined child reservations count once overall and once in each matching c
         reservation({ reservation_id: 12, reservation_type: "RESTAURANT", status: "Pending", reservation_date: "2026-12-05" }),
     ];
 
-    assert.deepEqual(deriveCustomerProfileStats(reservations, "2026-11-26"), {
+    assert.deepEqual(deriveCustomerProfileStats(reservations, 2), {
         totalBookings: 2,
         hotelBookings: 1,
         diningBookings: 2,
@@ -55,7 +55,8 @@ test("combined child reservations count once overall and once in each matching c
 });
 
 test("unavailable reservation data is distinct from an empty history", () => {
-    assert.equal(deriveCustomerProfileStats(null, "2026-11-26"), null);
+    assert.equal(deriveCustomerProfileStats(null, 0), null);
+    assert.equal(deriveCustomerProfileStats([], null), null);
 });
 
 test("customer profile has tabs, booking statistics, and preserves profile APIs and manager tabs", async () => {

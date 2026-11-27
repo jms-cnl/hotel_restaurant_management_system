@@ -14,9 +14,9 @@ type CustomerBooking = {
 
 export const deriveCustomerProfileStats = (
     reservations: readonly Reservation[] | null | undefined,
-    today: string,
+    upcomingBookings: number | null | undefined,
 ): CustomerProfileStats | null => {
-    if (!reservations) return null;
+    if (!reservations || upcomingBookings == null) return null;
 
     const bookings = new Map<string, CustomerBooking>();
     for (const reservation of reservations) {
@@ -30,7 +30,6 @@ export const deriveCustomerProfileStats = (
 
     let hotelBookings = 0;
     let diningBookings = 0;
-    let upcomingBookings = 0;
     let completedBookings = 0;
 
     for (const { reservations: children } of bookings.values()) {
@@ -43,11 +42,6 @@ export const deriveCustomerProfileStats = (
             continue;
         }
 
-        const upcoming = children.some((item) => {
-            const date = item.reservation_type === "HOTEL" ? item.check_in_date : item.reservation_date;
-            return (item.status === "Pending" || item.status === "Confirmed") && Boolean(date && date.slice(0, 10) >= today);
-        });
-        if (upcoming) upcomingBookings += 1;
     }
 
     return {
