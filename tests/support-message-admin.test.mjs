@@ -7,7 +7,8 @@ const [{ default: supportMessageRouter }, { runWithRequest }] = await Promise.al
     import("../dist/config/supabase.js"),
 ]);
 const roleId = { Customer: 1, Staff: 2, Admin: 3 };
-const message = { support_message_id: 23, customer_id: "customer-123", subject: "Help", message: "Please call", status: "open" };
+const customer = { first_name: "Ada", last_name: "Customer", email: "ada@example.test" };
+const message = { support_message_id: 23, customer_id: "customer-123", customer, subject: "Help", message: "Please call", status: "open" };
 const jsonResponse = (body, status = 200, contentType = "application/json") => new Response(JSON.stringify(body), { status, headers: { "Content-Type": contentType } });
 const invoke = async ({ method = "GET", path = "/", roleName = "Admin", authenticated = true, status, result = [message], failure = false } = {}) => {
     const routePath = path === "/23" ? "/:id" : path === "/23/status" ? "/:id/status" : path;
@@ -54,15 +55,19 @@ const invoke = async ({ method = "GET", path = "/", roleName = "Admin", authenti
     finally { globalThis.fetch = previousFetch; }
     return { response: res, calls };
 };
-test("Admin can list support messages", async () => {
-    const { response } = await invoke({ result: [message] });
+test("Admin can list support messages with customer identity from the existing user relationship", async () => {
+    const { response, calls } = await invoke({ result: [message] });
     assert.equal(response.statusCode, 200);
     assert.deepEqual(response.body, [message]);
+    const select = calls.find((call) => call.url.pathname === "/rest/v1/support_message").url.searchParams.get("select");
+    assert.match(select, /customer:user!support_message_customer_id_fkey\(first_name,last_name,email\)/);
 });
 test("Admin can view a support message detail", async () => {
-    const { response } = await invoke({ path: "/23", result: message });
+    const { response, calls } = await invoke({ path: "/23", result: message });
     assert.equal(response.statusCode, 200);
     assert.deepEqual(response.body, message);
+    const select = calls.find((call) => call.url.pathname === "/rest/v1/support_message").url.searchParams.get("select");
+    assert.match(select, /customer:user!support_message_customer_id_fkey\(first_name,last_name,email\)/);
 });
 for (const [from, to] of [["open", "resolved"], ["resolved", "open"]]) {
     test(`Admin can change support message status from ${from} to ${to}`, async () => {
@@ -70,9 +75,11 @@ for (const [from, to] of [["open", "resolved"], ["resolved", "open"]]) {
         const { response, calls } = await invoke({ method: "PATCH", path: "/23/status", status: to, result: updated });
         assert.equal(response.statusCode, 200);
         assert.equal(response.body.status, to);
+        assert.deepEqual(response.body.customer, customer);
         const update = calls.find((call) => call.url.pathname === "/rest/v1/support_message" && call.method === "PATCH");
         assert.ok(update);
         assert.equal(update.body.status, to);
+        assert.match(update.url.searchParams.get("select"), /customer:user!support_message_customer_id_fkey\(first_name,last_name,email\)/);
     });
 }
 for (const roleName of ["Customer", "Staff"]) {

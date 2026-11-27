@@ -4,12 +4,20 @@ export type SupportMessageStatus = "open" | "resolved";
 export interface AdminSupportMessage {
     support_message_id: number;
     customer_id: string;
+    customer?: { first_name?: string | null; last_name?: string | null; email?: string | null } | null;
     subject: string;
     message: string;
     status: SupportMessageStatus;
     created_at: string;
 }
 export type SupportInboxRequest = (path: string, status?: SupportMessageStatus) => Promise<AdminSupportMessage[] | AdminSupportMessage>;
+
+export const supportMessageCustomerLabel = (message: Pick<AdminSupportMessage, "customer_id" | "customer">) => {
+    const firstName = message.customer?.first_name?.trim();
+    const lastName = message.customer?.last_name?.trim();
+    const email = message.customer?.email?.trim();
+    return firstName && lastName && email ? `${firstName} ${lastName} (${email})` : message.customer_id;
+};
 
 const requestFromApi: SupportInboxRequest = (path, status) => status
     ? apiPatch<AdminSupportMessage>(path, { status })

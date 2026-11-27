@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
-import { createAdminSupportInboxModel } from "../adminSupportInbox";
+import { createAdminSupportInboxModel, supportMessageCustomerLabel } from "../adminSupportInbox";
 import type { SupportMessageStatus } from "../adminSupportInbox";
 
 type InboxModel = NonNullable<ReturnType<typeof createAdminSupportInboxModel>>;
@@ -19,11 +19,11 @@ export function AdminSupportInbox({ model }: { model?: InboxModel }) {
                 </select></label>
                 {inbox.isLoading ? <p role="status">Loading support messages…</p> : inbox.filteredMessages.length === 0
                     ? <div className="support-inbox-empty"><h2>No messages</h2><p>{inbox.emptyMessage}</p></div>
-                    : <div className="admin-crud-table-wrap"><table className="admin-crud-table"><thead><tr><th>Subject</th><th>Customer</th><th>Status</th><th>Created</th></tr></thead><tbody>{inbox.filteredMessages.map(message => <tr key={message.support_message_id}><td><button type="button" className="support-inbox-subject" onClick={() => void inbox.selectMessage(message.support_message_id)}>{message.subject}</button></td><td>{message.customer_id}</td><td><span className={`admin-crud-status ${message.status}`}>{message.status}</span></td><td>{formatDate(message.created_at)}</td></tr>)}</tbody></table></div>}
+                    : <div className="admin-crud-table-wrap"><table className="admin-crud-table"><thead><tr><th>Subject</th><th>Customer</th><th>Status</th><th>Created</th></tr></thead><tbody>{inbox.filteredMessages.map(message => <tr key={message.support_message_id}><td><button type="button" className="support-inbox-subject" onClick={() => void inbox.selectMessage(message.support_message_id)}>{message.subject}</button></td><td>{supportMessageCustomerLabel(message)}</td><td><span className={`admin-crud-status ${message.status}`}>{message.status}</span></td><td>{formatDate(message.created_at)}</td></tr>)}</tbody></table></div>}
             </section>
             <section className="support-inbox-detail" aria-label="Message detail">
                 {inbox.selectedMessage ? <><div className="support-inbox-detail-heading"><span className={`admin-crud-status ${inbox.selectedMessage.status}`}>{inbox.selectedMessage.status}</span><button type="button" className="support-inbox-action" disabled={inbox.actionDisabled} onClick={() => void inbox.changeStatus()}>{inbox.isPending ? "Updating…" : inbox.selectedMessage.status === "open" ? "Resolve" : "Reopen"}</button></div>
-                    <h2>{inbox.selectedMessage.subject}</h2><dl><div><dt>Customer</dt><dd>{inbox.selectedMessage.customer_id}</dd></div><div><dt>Created</dt><dd>{formatDate(inbox.selectedMessage.created_at)}</dd></div></dl><p className="support-inbox-message">{inbox.selectedMessage.message}</p></>
+                    <h2>{inbox.selectedMessage.subject}</h2><dl><div><dt>Customer</dt><dd>{supportMessageCustomerLabel(inbox.selectedMessage)}</dd></div><div><dt>Created</dt><dd>{formatDate(inbox.selectedMessage.created_at)}</dd></div></dl><p className="support-inbox-message">{inbox.selectedMessage.message}</p></>
                     : <div className="support-inbox-empty"><h2>Select a message</h2><p>Choose a support message to view its details.</p></div>}
             </section>
         </div>
