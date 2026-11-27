@@ -71,6 +71,9 @@ const invokeSubmit = async ({ roleName, authenticated = true, databaseFailure = 
                 updated_at: "2026-11-27T00:00:00Z",
             }, 201, "application/vnd.pgrst.object+json");
         }
+        if (url.pathname === "/rest/v1/support_message_history" && method === "POST") {
+            return jsonResponse([], 201);
+        }
         throw new Error(`Unexpected backend request: ${method} ${url.pathname}`);
     };
 
@@ -113,6 +116,14 @@ test("Customer can submit and gets an open message owned by their authenticated 
         subject: "Help",
         message: "Please contact me",
         status: "open",
+    });
+    const historyInsert = calls.find((call) => call.url.pathname === "/rest/v1/support_message_history");
+    assert.deepEqual(historyInsert.body, {
+        support_message_id: 23,
+        actor_user_id: "customer-123",
+        event_type: "submitted",
+        previous_status: null,
+        new_status: "open",
     });
 });
 
