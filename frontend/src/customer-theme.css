@@ -2115,6 +2115,106 @@
   .combined-primary-button, .combined-secondary-button { flex: 1; }
 }
 
+/* Customer notifications and account access */
+.customer-app .notification-link.active, .customer-app .notification-link:hover { color: #e4bd70; }
+.customer-notifications-heading { margin-bottom: 24px; }
+.customer-notifications-heading .eyebrow { margin-bottom: 8px; color: #e4bd70; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.14em; }
+.customer-notifications-heading h1 { margin: 0; color: #f5f5f5; font-family: 'Playfair Display', serif; font-size: clamp(1.8rem, 4vw, 2.5rem); }
+.customer-notifications-heading > p:last-child { margin: 8px 0 0; color: #aab4c4; }
+.customer-notification-list { display: grid; gap: 12px; }
+.customer-notification-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-width: 0;
+  padding: 20px 22px;
+  border: 1px solid #34415a;
+  border-left: 3px solid #56647a;
+  border-radius: 11px;
+  background: #111b2d;
+}
+.customer-notification-card.is-unread { border-left-color: #e4bd70; background: linear-gradient(100deg, #1b2940, #111b2d 70%); }
+.customer-notification-card.is-read { color: #c1c8d4; }
+.customer-notification-copy { min-width: 0; }
+.customer-notification-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.customer-notification-title-row h2 { margin: 0; color: #f5f5f5; font-family: 'Playfair Display', serif; font-size: 1.1rem; overflow-wrap: anywhere; }
+.customer-notification-title-row span { padding: 4px 8px; border: 1px solid #44536c; border-radius: 999px; color: #aab4c4; font-size: 0.67rem; }
+.customer-notification-card.is-unread .customer-notification-title-row span { border-color: #806b43; color: #e4bd70; }
+.customer-notification-copy > p { margin: 8px 0; color: #c1c8d4; line-height: 1.55; overflow-wrap: anywhere; }
+.customer-notification-copy time { color: #8fa2b7; font-size: 0.75rem; }
+.customer-notification-read-button {
+  flex: 0 0 auto;
+  padding: 10px 14px;
+  border: 1px solid #8a7449;
+  border-radius: 7px;
+  background: #202e40;
+  color: #e4bd70;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.customer-notification-read-button:hover { background: #2c3b50; }
+.customer-notification-read-button:focus-visible { outline: 2px solid #e4bd70; outline-offset: 3px; }
+.customer-notifications-empty,
+.customer-notifications-page > .customer-notifications-state {
+  padding: 32px;
+  border: 1px solid #34415a;
+  border-radius: 11px;
+  background: #111b2d;
+  color: #c1c8d4;
+  text-align: center;
+}
+.customer-notifications-empty h2 { margin: 0 0 8px; color: #f5f5f5; font-family: 'Playfair Display', serif; }
+.customer-notifications-empty p { margin: 0; }
+.customer-auth-page { padding: clamp(22px, 5vw, 52px) 20px; background: radial-gradient(ellipse at 50% 0%, #1c2d49 0%, #0b1428 62%); }
+.customer-auth-page .auth-card {
+  padding: clamp(26px, 5vw, 42px);
+  border-color: #34415a;
+  border-radius: 16px;
+  background: #121f37;
+  box-shadow: 0 24px 64px #0006;
+}
+.customer-auth-page .auth-brand { margin-bottom: 28px; }
+.customer-auth-page .auth-eyebrow { letter-spacing: 0.14em; }
+.customer-auth-page .auth-description { margin-bottom: 22px; }
+.customer-auth-page .auth-form { gap: 14px; }
+.customer-auth-page .auth-form label { display: grid; gap: 7px; margin-top: 2px; color: #d4dae4; }
+.customer-auth-page .auth-form input {
+  box-sizing: border-box;
+  min-height: 48px;
+  border-color: #44536c;
+  background: #0b1428;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.customer-auth-page .auth-form input:focus-visible {
+  border-color: #e4bd70;
+  outline: 2px solid #e4bd7055;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 3px #e4bd701c;
+}
+.customer-auth-page .auth-card > .alert[role="alert"] {
+  margin: 16px 0;
+  padding: 12px 14px;
+  border: 1px solid #a85c68;
+  border-radius: 8px;
+  background: #542d3b;
+  color: #ffe0e3;
+  line-height: 1.5;
+}
+.customer-auth-page .auth-button { min-height: 48px; }
+.customer-auth-page .auth-button:focus-visible, .customer-auth-page .auth-home-link:focus-visible,
+.customer-auth-page .auth-brand:focus-visible, .customer-auth-page .auth-switch a:focus-visible { outline: 2px solid #e4bd70; outline-offset: 3px; }
+@media (max-width: 600px) {
+  .customer-notifications-page { padding: 34px 5% 52px; }
+  .customer-notification-card { align-items: stretch; flex-direction: column; gap: 14px; padding: 17px; }
+  .customer-notification-read-button { width: 100%; min-height: 44px; }
+  .customer-notifications-empty, .customer-notifications-page > .customer-notifications-state { padding: 24px 18px; }
+  .customer-auth-page { align-items: flex-start; padding: 24px 14px; }
+  .customer-auth-page .auth-card { padding: 26px 20px; }
+}
+
 @media (max-width: 600px) {
   .sample-listings, .booking-summary { grid-template-columns: 1fr; }
 
