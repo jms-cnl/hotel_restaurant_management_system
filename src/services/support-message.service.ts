@@ -1,5 +1,11 @@
 import type { Request } from "express";
 import { getRequestSupabase } from "../config/supabase.js";
+import {
+    AdminInboxNotificationObserver,
+    SupportMessageHistoryObserver,
+    SupportMessageSubject,
+    type SupportMessageStatus,
+} from "./support-message-observer.js";
 
 const SUBJECT_MAX_LENGTH = 120;
 const MESSAGE_MAX_LENGTH = 5000;
@@ -39,6 +45,14 @@ const validateInput = (input: unknown): SupportMessageInput => {
     return { subject: fields.subject.trim(), message: fields.message.trim() };
 };
 
+const messageFields = "support_message_id, customer_id, subject, message, status, created_at, updated_at";
+const createSupportMessageSubject = (req: Request) => {
+    const subject = new SupportMessageSubject();
+    subject.attach(new SupportMessageHistoryObserver(req));
+    subject.attach(new AdminInboxNotificationObserver(req));
+    return subject;
+};
+
 export const createSupportMessage = async (req: Request, input: unknown) => {
     const customerId = req.auth?.user.id;
     if (!customerId) throw new SupportMessageError("Authentication required", 401);
@@ -53,5 +67,63 @@ export const createSupportMessage = async (req: Request, input: unknown) => {
     }).select("support_message_id, customer_id, subject, message, status, created_at, updated_at").single();
 
     if (error || !data) throw new Error("Support message persistence failed");
+    await createSupportMessageSubject(req).notify({
+        type: "submitted",
+        supportMessageId: data.support_message_id,
+        actorId: customerId,
+        newStatus: "open",
+    });
+    return data;
+};
+
+const parseSupportMessageId = (id: string) => {
+    if (!/^\d+$/.test(id) || Number(id) < 1 || !Number.isSafeInteger(Number(id))) {
+        throw new SupportMessageError("Invalid support message id");
+    }
+    return Number(id);
+};
+const throwOnMessageQueryError = (error: { code?: string } | null, notFound = false) => {
+    if (!error) return;
+    if (notFound && error.code === "PGRST116") throw new SupportMessageError("Support message not found", 404);
+    throw new Error("Support message persistence failed");
+};
+export const listSupportMessages = async (req: Request) => {
+    const { data, error } = await getRequestSupabase(req).from("support_message")
+        .select(messageFields).order("created_at", { ascending: false });
+    throwOnMessageQueryError(error);
+    return data ?? [];
+};
+export const getSupportMessage = async (req: Request, id: string) => {
+    const messageId = parseSupportMessageId(id);
+    const { data, error } = await getRequestSupabase(req).from("support_message")
+        .select(messageFields).eq("support_message_id", messageId).single();
+    throwOnMessageQueryError(error, true);
+    if (!data) throw new SupportMessageError("Support message not found", 404);
+    return data;
+};
+export const updateSupportMessageStatus = async (req: Request, id: string, status: unknown) => {
+    const messageId = parseSupportMessageId(id);
+    if (status !== "open" && status !== "resolved") throw new SupportMessageError("Status must be open or resolved");
+    const client = getRequestSupabase(req);
+    const current = await client.from("support_message").select(messageFields)
+        .eq("support_message_id", messageId).single();
+    throwOnMessageQueryError(current.error, true);
+    if (!current.data) throw new SupportMessageError("Support message not found", 404);
+    if (current.data.status === status) return current.data;
+    const { data, error } = await client.from("support_message").update({
+        status,
+        updated_at: new Date().toISOString(),
+    }).eq("support_message_id", messageId).eq("status", current.data.status)
+        .select(messageFields).single();
+    throwOnMessageQueryError(error, true);
+    if (!data) throw new SupportMessageError("Support message not found", 404);
+
+    await createSupportMessageSubject(req).notify({
+        type: "status_changed",
+        supportMessageId: messageId,
+        actorId: req.auth!.user.id,
+        previousStatus: current.data.status as SupportMessageStatus,
+        newStatus: status,
+    });
     return data;
 };
