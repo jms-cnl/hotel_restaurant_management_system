@@ -5,9 +5,14 @@ import { canCancelCombinedBooking, canCancelReservation, collectionState, combin
 import type { CombinedBooking, Reservation, RestaurantTable, Room } from "../types";
 
 const statusClass = (status: string) => status.toLowerCase().replaceAll(" ", "-");
+const formatReservationTime = (time: string | null | undefined) => time?.slice(0, 5) ?? "—";
 const todayInManila = () => new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit",
 }).format(new Date());
+
+export function CombinedDiningTime({ startTime, endTime }: { startTime?: string | null; endTime?: string | null }) {
+    return <div><span>DINING TIME</span><strong>{formatReservationTime(startTime)}{endTime ? `–${formatReservationTime(endTime)}` : ""}</strong></div>;
+}
 
 export function CustomerReservations() {
     const [items, setItems] = useState<Reservation[]>([]);
@@ -143,7 +148,7 @@ export function CustomerReservations() {
                             <div><span>CHECK-IN</span><strong>{hotelReservation?.check_in_date ?? "—"}</strong></div>
                             <div><span>CHECK-OUT</span><strong>{hotelReservation?.check_out_date ?? "—"}</strong></div>
                             <div><span>DINING DATE</span><strong>{diningReservation?.reservation_date ?? "—"}</strong></div>
-                            <div><span>DINING TIME</span><strong>{diningReservation?.start_time ?? "—"}{diningReservation?.end_time ? `–${diningReservation.end_time}` : ""}</strong></div>
+                            <CombinedDiningTime startTime={diningReservation?.start_time} endTime={diningReservation?.end_time} />
                         </div>
                         <div className="reservation-card-footer"><small>Combined booking #{booking.combined_booking_id}</small>{canCancelCombinedBooking(booking.status) && <button type="button" className="cancel-reservation-button" disabled={Boolean(cancelling)} onClick={() => void cancelCombinedBooking(booking)}>{pendingCancel ? "Cancelling…" : "Cancel"}</button>}</div>
                     </div>
