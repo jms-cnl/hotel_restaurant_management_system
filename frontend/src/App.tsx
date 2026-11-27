@@ -15,7 +15,7 @@ import { CustomerCombinedBookings } from "./components/CustomerCombinedBookings"
 import { CustomerSupportForm } from "./components/CustomerSupportForm";
 import { buildCombinedBookingPayload } from "./customerData";
 import { deriveCustomerProfileStats } from "./customerProfile";
-import { countUpcomingBookings, getTodayInManila } from "./reservationStats";
+import { countCustomerBookingStats, countUpcomingBookings, getTodayInManila } from "./reservationStats";
 import { countCombinedBookings, loadCombinedBookingCount } from "./adminBookings";
 import { formatAdminCombinedBookingDateTime } from "./bookingTime";
 import { passwordErrors, passwordRequirements } from "./passwordPolicy";
@@ -716,7 +716,10 @@ function Profile() {
     const profileUpcomingCount = customerReservations && customerCombinedBookings
         ? countUpcomingBookings(customerReservations, customerCombinedBookings, getTodayInManila())
         : null;
-    const profileStats = deriveCustomerProfileStats(customerReservations, profileUpcomingCount);
+    const profileBookingCounts = customerReservations && customerCombinedBookings
+        ? countCustomerBookingStats(customerReservations, customerCombinedBookings)
+        : null;
+    const profileStats = deriveCustomerProfileStats(customerReservations, profileBookingCounts, profileUpcomingCount);
     const submit = async (event: FormEvent) => { event.preventDefault(); setError(""); try { await updateProfile(form); setMessage("Profile updated"); setEditingProfile(false); } catch (e) { setError(e instanceof Error ? e.message : "Update failed"); } };
     const changePassword = async (event: FormEvent) => { event.preventDefault(); setError(""); setMessage(""); if (passwordErrors(passwordForm.next).length) { setError(`Password does not meet the requirements: ${passwordErrors(passwordForm.next).join(", ")}`); return; } if (passwordForm.next !== passwordForm.confirm) { setError("Password confirmation does not match"); return; } try { const result = await apiPost<{ message: string }>("/auth/change-password", { current_password: passwordForm.current, new_password: passwordForm.next }); setMessage(result.message); setPasswordForm({ current: "", next: "", confirm: "" }); } catch (e) { setError(e instanceof Error ? e.message : "Password change failed"); } };
     const changeCustomerPassword = async (event: FormEvent) => { event.preventDefault(); setError(""); setMessage(""); if (passwordErrors(passwordForm.next).length) { setError(`Password does not meet the requirements: ${passwordErrors(passwordForm.next).join(", ")}`); return; } if (passwordForm.next !== passwordForm.confirm) { setError("Password confirmation does not match"); return; } try { const result = await customerPasswordRequest(); setMessage(result.message); setPasswordForm({ current: "", next: "", confirm: "" }); } catch (e) { setError(e instanceof Error ? e.message : "Password change failed"); } };

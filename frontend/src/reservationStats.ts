@@ -15,6 +15,26 @@ export const getTodayInManila = (now = new Date()) => new Intl.DateTimeFormat("e
     day: "2-digit",
 }).format(now);
 
+export type CustomerBookingStats = {
+    hotelBookings: number;
+    diningBookings: number;
+    combinedBookings: number;
+    totalBookings: number;
+};
+
+export const countCustomerBookingStats = (
+    reservations: readonly Reservation[],
+    combinedBookings: readonly CombinedBooking[],
+): CustomerBookingStats => {
+    const standaloneReservations = reservations.filter((reservation) => reservation.combined_booking_id == null);
+    return {
+        hotelBookings: standaloneReservations.filter((reservation) => reservation.reservation_type === "HOTEL").length,
+        diningBookings: standaloneReservations.filter((reservation) => reservation.reservation_type === "RESTAURANT").length,
+        combinedBookings: combinedBookings.length,
+        totalBookings: standaloneReservations.length + combinedBookings.length,
+    };
+};
+
 export const countUpcomingBookings = (
     reservations: readonly Reservation[],
     combinedBookings: readonly CombinedBooking[],

@@ -1,3 +1,4 @@
+import type { CustomerBookingStats } from "./reservationStats";
 import type { Reservation } from "./types.ts";
 
 export type CustomerProfileStats = {
@@ -14,9 +15,10 @@ type CustomerBooking = {
 
 export const deriveCustomerProfileStats = (
     reservations: readonly Reservation[] | null | undefined,
+    bookingCounts: CustomerBookingStats | null | undefined,
     upcomingBookings: number | null | undefined,
 ): CustomerProfileStats | null => {
-    if (!reservations || upcomingBookings == null) return null;
+    if (!reservations || !bookingCounts || upcomingBookings == null) return null;
 
     const bookings = new Map<string, CustomerBooking>();
     for (const reservation of reservations) {
@@ -28,14 +30,9 @@ export const deriveCustomerProfileStats = (
         bookings.set(key, booking);
     }
 
-    let hotelBookings = 0;
-    let diningBookings = 0;
     let completedBookings = 0;
 
     for (const { reservations: children } of bookings.values()) {
-        if (children.some((item) => item.reservation_type === "HOTEL")) hotelBookings += 1;
-        if (children.some((item) => item.reservation_type === "RESTAURANT")) diningBookings += 1;
-
         const completed = children.some((item) => item.status === "Completed");
         if (completed) {
             completedBookings += 1;
@@ -45,9 +42,9 @@ export const deriveCustomerProfileStats = (
     }
 
     return {
-        totalBookings: bookings.size,
-        hotelBookings,
-        diningBookings,
+        totalBookings: bookingCounts.totalBookings,
+        hotelBookings: bookingCounts.hotelBookings,
+        diningBookings: bookingCounts.diningBookings,
         upcomingBookings,
         completedBookings,
     };
