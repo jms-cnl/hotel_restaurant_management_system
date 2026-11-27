@@ -3884,8 +3884,18 @@
 .admin-app .support-inbox-list, .admin-app .support-inbox-detail { min-width: 0; padding: 20px; border: 1px solid #ffffff16; border-radius: 14px; background: #111b2b; }
 .admin-app .support-inbox-filter { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; color: #c1c8d4; font-size: .9rem; }
 .admin-app .support-inbox-filter select { min-width: 150px; padding: 9px 12px; border: 1px solid #394355; border-radius: 8px; color: #f8f7f4; background: #0b1220; }
-.admin-app .support-inbox-subject { padding: 0; border: 0; color: #f8f7f4; background: none; text-align: left; font-weight: 600; }
+.admin-app .support-inbox-subject { display: block; max-width: 100%; padding: 0; border: 0; color: #f8f7f4; background: none; text-align: left; white-space: normal; overflow-wrap: anywhere; font-weight: 600; }
 .admin-app .support-inbox-subject:hover { color: #e7c99a; }
+.admin-app .support-inbox-list .admin-crud-table { width: 100%; min-width: 0; table-layout: fixed; }
+.admin-app .support-inbox-list .admin-crud-table th:nth-child(1), .admin-app .support-inbox-list .admin-crud-table td:nth-child(1) { width: 40%; }
+.admin-app .support-inbox-list .admin-crud-table th:nth-child(2), .admin-app .support-inbox-list .admin-crud-table td:nth-child(2) { width: 24%; }
+.admin-app .support-inbox-list .admin-crud-table th:nth-child(3), .admin-app .support-inbox-list .admin-crud-table td:nth-child(3) { width: 16%; }
+.admin-app .support-inbox-list .admin-crud-table th:nth-child(4), .admin-app .support-inbox-list .admin-crud-table td:nth-child(4) { width: 20%; }
+.admin-app .support-inbox-list .admin-crud-table th, .admin-app .support-inbox-list .admin-crud-table td { overflow-wrap: anywhere; }
+.admin-app .support-inbox-list .admin-crud-table-wrap { scrollbar-color: #e7c99a #111b2b; scrollbar-width: thin; }
+.admin-app .support-inbox-list .admin-crud-table-wrap::-webkit-scrollbar { width: 8px; height: 8px; }
+.admin-app .support-inbox-list .admin-crud-table-wrap::-webkit-scrollbar-track { background: #111b2b; }
+.admin-app .support-inbox-list .admin-crud-table-wrap::-webkit-scrollbar-thumb { border-radius: 8px; background: #e7c99a; }
 .admin-app .support-inbox-empty { padding: 34px 18px; color: #aeb8c8; text-align: center; }
 .admin-app .support-inbox-empty h2 { margin: 0 0 8px; color: #f8f7f4; font-size: 1.05rem; }
 .admin-app .support-inbox-empty p { margin: 0; }
