@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
+import { customerSupportNavigationLink } from "../customerSupportForm";
 
 const customerLinks = [
     ["Hotel & Restaurant", "/home"],
@@ -10,6 +11,7 @@ const customerLinks = [
 export function CustomerLayout({ children }: { children: ReactNode }) {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const supportLink = customerSupportNavigationLink(user?.role?.role_name);
 
     const signOut = async () => {
         await logout();
@@ -21,6 +23,7 @@ export function CustomerLayout({ children }: { children: ReactNode }) {
             <Link className="customer-logo" to="/home"><span className="customer-logo-icon">L</span><span>StayEase</span></Link>
             <nav className="customer-nav-links" aria-label="Customer navigation">
                 {customerLinks.map(([label, path]) => <NavLink key={path} to={path} end={path === "/home"}>{label}</NavLink>)}
+                {supportLink && <NavLink key={supportLink.path} to={supportLink.path}>{supportLink.label}</NavLink>}
             </nav>
             <div className="customer-nav-actions">
                 <NavLink className={({ isActive }) => `notification-link${isActive ? " active" : ""}`} to="/notifications" aria-label="Notifications" title="Notifications">🔔</NavLink>
