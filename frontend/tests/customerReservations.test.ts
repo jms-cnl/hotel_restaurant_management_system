@@ -19,3 +19,15 @@ test("Customer combined reservation dining time renders without seconds", () => 
     assert.match(markup, /13:06–15:08/);
     assert.doesNotMatch(markup, /13:06:00|15:08:00/);
 });
+
+test("Customer combined reservation dining time handles missing and invalid values", () => {
+    const missingStart = renderToStaticMarkup(createElement(componentModule.CombinedDiningTime, { endTime: "invalid" }));
+    const invalidEnd = renderToStaticMarkup(createElement(componentModule.CombinedDiningTime, {
+        startTime: "14:00:00",
+        endTime: "25:00:00",
+    }));
+
+    assert.match(missingStart, /—/);
+    assert.match(invalidEnd, /14:00/);
+    assert.doesNotMatch(invalidEnd, /–—/);
+});

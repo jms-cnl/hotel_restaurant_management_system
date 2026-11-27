@@ -3,12 +3,13 @@ import { Link } from "react-router-dom";
 import { apiDelete, apiGet } from "../api";
 import { canCancelCombinedBooking, canCancelReservation, collectionState, combinedVenueLabel, countWhenAvailable, filterReservations } from "../customerData";
 import { countUpcomingBookings, getTodayInManila } from "../reservationStats";
+import { formatReservationTime } from "../bookingTime";
 import type { CombinedBooking, Reservation, RestaurantTable, Room } from "../types";
 
 const statusClass = (status: string) => status.toLowerCase().replaceAll(" ", "-");
-const formatReservationTime = (time: string | null | undefined) => time?.slice(0, 5) ?? "—";
 export function CombinedDiningTime({ startTime, endTime }: { startTime?: string | null; endTime?: string | null }) {
-    return <div><span>DINING TIME</span><strong>{formatReservationTime(startTime)}{endTime ? `–${formatReservationTime(endTime)}` : ""}</strong></div>;
+    const formattedEndTime = endTime ? formatReservationTime(endTime) : "";
+    return <div><span>DINING TIME</span><strong>{formatReservationTime(startTime)}{formattedEndTime && formattedEndTime !== "—" ? `–${formattedEndTime}` : ""}</strong></div>;
 }
 
 export function CustomerReservations() {
