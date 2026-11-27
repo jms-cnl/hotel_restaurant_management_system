@@ -1,15 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiDelete, apiGet } from "../api";
-import { canCancelCombinedBooking, canCancelReservation, collectionState, combinedVenueLabel, countWhenAvailable, filterReservations, isUpcomingBooking } from "../customerData";
+import { canCancelCombinedBooking, canCancelReservation, collectionState, combinedVenueLabel, countWhenAvailable, filterReservations } from "../customerData";
+import { countUpcomingBookings, getTodayInManila } from "../reservationStats";
 import type { CombinedBooking, Reservation, RestaurantTable, Room } from "../types";
 
 const statusClass = (status: string) => status.toLowerCase().replaceAll(" ", "-");
 const formatReservationTime = (time: string | null | undefined) => time?.slice(0, 5) ?? "—";
-const todayInManila = () => new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit",
-}).format(new Date());
-
 export function CombinedDiningTime({ startTime, endTime }: { startTime?: string | null; endTime?: string | null }) {
     return <div><span>DINING TIME</span><strong>{formatReservationTime(startTime)}{endTime ? `–${formatReservationTime(endTime)}` : ""}</strong></div>;
 }
@@ -73,11 +70,7 @@ export function CustomerReservations() {
     const visibleCombined = useMemo(() => combinedItems.filter((item) => status === "all" || item.status === status), [combinedItems, status]);
     const hotelCount = standaloneItems.filter((item) => item.reservation_type === "HOTEL").length;
     const diningCount = standaloneItems.filter((item) => item.reservation_type === "RESTAURANT").length;
-    const today = todayInManila();
-    const upcomingCount = standaloneItems.filter((item) => isUpcomingBooking(item.status,
-        item.reservation_type === "HOTEL" ? item.check_in_date : item.reservation_date, today)).length +
-        combinedItems.filter((item) => isUpcomingBooking(item.status,
-            item.reservation?.find((reservation) => reservation.reservation_type === "HOTEL")?.check_in_date, today)).length;
+    const upcomingCount = countUpcomingBookings(items, combinedItems, getTodayInManila());
 
     const cancelReservation = async (reservation: Reservation) => {
         if (!canCancelReservation(reservation) || !window.confirm("Cancel this reservation?")) return;

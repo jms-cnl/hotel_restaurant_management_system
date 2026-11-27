@@ -146,9 +146,6 @@ export const canCancelReservation = (reservation: { status: string; combined_boo
 export const canCancelCombinedBooking = (status: string) =>
     ["pending", "confirmed"].includes(normalized(status));
 
-export const isUpcomingBooking = (status: string, startDate: string | null | undefined, today: string) =>
-    ["pending", "confirmed"].includes(normalized(status)) && Boolean(startDate) && startDate! > today;
-
 export const claimRoomMediaRefresh = (roomId: number, attemptedRoomIds: Set<number>) => {
     if (attemptedRoomIds.has(roomId)) return false;
     attemptedRoomIds.add(roomId);
