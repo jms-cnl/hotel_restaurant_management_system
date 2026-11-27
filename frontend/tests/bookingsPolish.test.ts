@@ -14,9 +14,9 @@ test("Bookings workspace tabs use the existing active pill-tab treatment", async
 });
 
 test("Combined Bookings identifies Admin viewers as Admins", async () => {
-    const app = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
+    const bookingDisplayPages = await readFile(new URL("../src/components/BookingDisplayPages.tsx", import.meta.url), "utf8");
 
-    assert.match(app, /<p className="eyebrow">\{isAdmin\(user\) \? "ADMIN WORKSPACE" : "STAFF WORKSPACE"\}<\/p><h1>Combined Bookings<\/h1>/);
+    assert.match(bookingDisplayPages, /<p className="eyebrow">\{isAdmin\(user\) \? "ADMIN WORKSPACE" : "STAFF WORKSPACE"\}<\/p><h1>Combined Bookings<\/h1>/);
 });
 
 test("Completed status stays on one line in the Combined Bookings table", async () => {
