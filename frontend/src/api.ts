@@ -132,6 +132,11 @@ export const apiPost = <T>(path: string, body: unknown) => api<T>(path, { method
 export const apiPut = <T>(path: string, body: unknown) => api<T>(path, { method: "PUT", body: JSON.stringify(body) });
 export const apiPatch = <T>(path: string, body: unknown) => api<T>(path, { method: "PATCH", body: JSON.stringify(body) });
 export const apiDelete = <T = void>(path: string) => api<T>(path, { method: "DELETE" });
+export const getTableAmenities = <T>(tableId: number) => apiGet<T[]>(`/tables/${tableId}/amenities`);
+export const linkTableAmenity = (tableId: number, amenityId: number) =>
+    apiPost(`/tables/${tableId}/amenities`, { amenity_id: amenityId });
+export const unlinkTableAmenity = (tableId: number, amenityId: number) =>
+    apiDelete(`/tables/${tableId}/amenities/${amenityId}`);
 export const reportMeaningfulActivity = (recovery = false) =>
     apiPost<{ csrf_token: string }>(recovery ? "/auth/recovery/csrf" : "/auth/csrf", {});
 

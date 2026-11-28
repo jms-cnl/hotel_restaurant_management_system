@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { apiDelete, apiGet, apiPost, apiPut } from "../api";
-import { getInventoryResourceKind, type InventoryRecord } from "../adminInventoryKinds";
+import { apiDelete, apiGet, apiPost, apiPut, getTableAmenities, linkTableAmenity, unlinkTableAmenity } from "../api";
+import { getInventoryResourceKind, initialInventoryFormValues, inventoryPayload, validateInventoryValues, type InventoryRecord } from "../adminInventoryKinds";
 import { normalizeResourceStatus, resourceStatusClass, type InventoryResourceKind as ResourceKind } from "../types";
 import { MediaManager } from "./MediaManager";
 
@@ -48,7 +48,7 @@ export function AdminInventoryPage({ kind }: { kind: ResourceKind }) {
 
     useEffect(() => { void load(); }, [kind]);
 
-    const amenityHotelId = definition.getAmenityHotelId(
+    const amenityParentId = definition.getAmenityHotelId(
         modal?.mode ?? "create",
         formValues,
         modal && modal.mode !== "create" ? modal.record : undefined,
@@ -56,19 +56,25 @@ export function AdminInventoryPage({ kind }: { kind: ResourceKind }) {
     const supportsAmenities = definition.supportsAmenities;
 
     useEffect(() => {
-        if (!supportsAmenities || !modal || modal.mode === "view" || !amenityHotelId) {
+        if (!supportsAmenities || !modal || modal.mode === "view" || !amenityParentId) {
             setAvailableAmenities([]);
             setAvailableAmenitiesLoading(false);
             return;
         }
         let active = true;
         setAvailableAmenitiesLoading(true);
-        apiGet<AmenityRecord[]>(`/amenities?hotel_id=${encodeURIComponent(amenityHotelId)}`)
+        const loadAmenities = async () => {
+            const hotelId = kind === "tables"
+                ? String((await apiGet<{ hotel_id: number }>(`/restaurants/${encodeURIComponent(amenityParentId)}`)).hotel_id)
+                : amenityParentId;
+            return apiGet<AmenityRecord[]>(`/amenities?hotel_id=${encodeURIComponent(hotelId)}`);
+        };
+        loadAmenities()
             .then((amenities) => { if (active) setAvailableAmenities(amenities); })
             .catch((caught) => { if (active) { setAvailableAmenities([]); setNotice(caught instanceof Error ? caught.message : "Unable to load amenities"); } })
             .finally(() => { if (active) setAvailableAmenitiesLoading(false); });
         return () => { active = false; };
-    }, [kind, modal?.mode, amenityHotelId]);
+    }, [kind, modal?.mode, amenityParentId]);
 
     const filteredRecords = useMemo(() => {
         const query = search.trim().toLowerCase();
@@ -87,7 +93,7 @@ export function AdminInventoryPage({ kind }: { kind: ResourceKind }) {
 
     const closeModal = () => { setModal(null); setFormValues({}); setNotice(""); setAvailableAmenities([]); setLinkedAmenities([]); setSelectedAmenities([]); setAmenitiesLoaded(false); };
     const openCreate = () => {
-        setFormValues(Object.fromEntries(definition.fields.map((field) => [field.key, field.key === "status" ? definition.defaultStatus : ""])));
+        setFormValues(initialInventoryFormValues(definition, "create"));
         setSelectedAmenities([]);
         setLinkedAmenities([]);
         setAmenitiesLoaded(definition.initialAmenitiesLoaded);
@@ -98,7 +104,9 @@ export function AdminInventoryPage({ kind }: { kind: ResourceKind }) {
         setLinkedAmenitiesLoading(true);
         setAmenitiesLoaded(false);
         try {
-            const amenities = await apiGet<AmenityRecord[]>(definition.getAmenitiesPath(record));
+            const amenities = kind === "tables"
+                ? await getTableAmenities<AmenityRecord>(Number(record.table_id))
+                : await apiGet<AmenityRecord[]>(definition.getAmenitiesPath(record));
             setLinkedAmenities(amenities);
             setSelectedAmenities(amenities.map((amenity) => amenity.amenity_id));
             setAmenitiesLoaded(true);
@@ -114,7 +122,7 @@ export function AdminInventoryPage({ kind }: { kind: ResourceKind }) {
         if (supportsAmenities) await loadResourceAmenities(record);
     };
     const openEdit = async (record: RecordData) => {
-        setFormValues(Object.fromEntries(definition.fields.map((field) => [field.key, asText(record[field.key])] )));
+        setFormValues(initialInventoryFormValues(definition, "edit", record));
         setSelectedAmenities([]);
         setLinkedAmenities([]);
         setNotice("");
@@ -125,14 +133,9 @@ export function AdminInventoryPage({ kind }: { kind: ResourceKind }) {
     const saveRecord = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         if (!modal || modal.mode === "view") return;
-        const payload: Record<string, unknown> = {};
-        for (const field of definition.fields) {
-            const value = (formValues[field.key] ?? "").trim();
-            if (field.required && !value) { setNotice(`Please complete the required field: ${field.label}.`); return; }
-            if (field.type === "number" && value && !Number.isFinite(Number(value))) { setNotice(`${field.label} must be a number.`); return; }
-            if (field.type === "number" && value && Number(value) < (field.min ?? 0)) { setNotice(`${field.label} must be at least ${field.min ?? 0}.`); return; }
-            if (value) payload[field.key] = field.type === "number" ? Number(value) : value;
-        }
+        const validationMessage = validateInventoryValues(definition.fields, formValues);
+        if (validationMessage) { setNotice(validationMessage); return; }
+        const payload: Record<string, unknown> = inventoryPayload(definition.fields, formValues);
         if (definition.shouldRequireAmenitiesLoaded(modal.mode) && !amenitiesLoaded) { setNotice("Amenities are still loading. Try again when they finish loading."); return; }
         setNotice("");
         setSavingRecord(true);
@@ -145,11 +148,19 @@ export function AdminInventoryPage({ kind }: { kind: ResourceKind }) {
             if (supportsAmenities) {
                 const resourceId = Number(savedRecord[definition.idField]);
                 const resourcePath = definition.getAmenitiesPath({ ...savedRecord, [definition.idField]: resourceId });
-                const currentAmenities = modal.mode === "create" ? [] : await apiGet<AmenityRecord[]>(resourcePath);
+                const currentAmenities = modal.mode === "create" ? [] : kind === "tables"
+                    ? await getTableAmenities<AmenityRecord>(resourceId)
+                    : await apiGet<AmenityRecord[]>(resourcePath);
                 const currentIds = new Set(currentAmenities.map((amenity) => amenity.amenity_id));
                 const selectedIds = new Set(selectedAmenities);
-                for (const amenityId of selectedIds) if (!currentIds.has(amenityId)) await apiPost(resourcePath, { amenity_id: amenityId });
-                for (const amenityId of currentIds) if (!selectedIds.has(amenityId)) await apiDelete(`${resourcePath}/${amenityId}`);
+                for (const amenityId of selectedIds) if (!currentIds.has(amenityId)) {
+                    if (kind === "tables") await linkTableAmenity(resourceId, amenityId);
+                    else await apiPost(resourcePath, { amenity_id: amenityId });
+                }
+                for (const amenityId of currentIds) if (!selectedIds.has(amenityId)) {
+                    if (kind === "tables") await unlinkTableAmenity(resourceId, amenityId);
+                    else await apiDelete(`${resourcePath}/${amenityId}`);
+                }
             }
             closeModal();
             setNotice(`${definition.singular} ${modal.mode === "create" ? "added" : "updated"}.`);
@@ -226,9 +237,9 @@ export function AdminInventoryPage({ kind }: { kind: ResourceKind }) {
                     {supportsAmenities && <div className="admin-crud-amenities-details"><h3>Amenities</h3>{linkedAmenitiesLoading ? <p role="status">Loading amenities…</p> : linkedAmenities.length ? <div className="admin-crud-amenity-list">{linkedAmenities.map((amenity) => <span className="admin-crud-amenity-chip" key={amenity.amenity_id}>{amenity.name}</span>)}</div> : <p>No amenities linked to this {definition.amenitySubject}.</p>}</div>}
                     <MediaManager entityType={definition.mediaEntityType} entityId={Number(modal.record[definition.idField])} manager />
                     <div className="admin-crud-form-actions"><button type="button" className="admin-crud-cancel" onClick={closeModal}>Close</button><button type="button" className="admin-crud-add" onClick={() => void openEdit(modal.record)}>Edit Record</button></div>
-                </> : <form onSubmit={(event) => void saveRecord(event)}>
+                </> : <form noValidate onSubmit={(event) => void saveRecord(event)}>
                     {notice && <div className="admin-crud-form-error" role="alert">{notice}</div>}
-                    <div className="admin-crud-fields">{definition.fields.map((field) => <label key={field.key}><span>{field.label}{field.required && <span className="admin-crud-required"> *</span>}</span>{field.type === "select" ? <select required={field.required} value={formValues[field.key] ?? ""} onChange={(event) => setFormValues((current) => ({ ...current, [field.key]: event.target.value }))}><option value="">Select {field.label}</option>{(field.options ?? []).map((option) => <option value={option} key={option}>{option}</option>)}</select> : <input type={field.type} required={field.required} min={field.type === "number" ? field.min ?? 0 : undefined} step={field.type === "number" ? "any" : undefined} value={formValues[field.key] ?? ""} onChange={(event) => { setFormValues((current) => ({ ...current, [field.key]: event.target.value })); if (definition.amenityParentField === field.key) { setSelectedAmenities([]); setAmenitiesLoaded(true); } }} />}</label>)}</div>
+                    <div className="admin-crud-fields">{definition.fields.map((field) => <label key={field.key}><span>{field.label}{field.required && <span className="admin-crud-required"> *</span>}</span>{field.type === "select" ? <select required={field.required} value={formValues[field.key] ?? ""} onChange={(event) => setFormValues((current) => ({ ...current, [field.key]: event.target.value }))}><option value="">Select {field.label}</option>{(field.options ?? []).map((option) => <option value={option} key={option}>{option}</option>)}</select> : <input type={field.type} required={field.required} min={field.type === "number" ? field.min ?? 0 : undefined} max={field.type === "number" ? field.max : undefined} step={field.type === "number" ? "any" : undefined} value={formValues[field.key] ?? ""} onChange={(event) => { setFormValues((current) => ({ ...current, [field.key]: event.target.value })); if (definition.amenityParentField === field.key) { setSelectedAmenities([]); setAmenitiesLoaded(true); } }} />}</label>)}</div>
                     {definition.shouldShowAmenitiesForm(modal.mode) && <div className="admin-crud-amenities-form"><div className="admin-crud-amenities-heading"><h3>{definition.amenitiesLabel}</h3><span>Optional</span></div><p>Select amenities available in this {definition.amenitySubject}. Amenities are loaded from the associated hotel.</p>{availableAmenitiesLoading ? <p role="status">Loading amenities…</p> : availableAmenities.length ? <div className="admin-crud-amenities-options">{availableAmenities.map((amenity) => <label className="admin-crud-amenity-option" key={amenity.amenity_id}><input type="checkbox" disabled={savingRecord} checked={selectedAmenities.includes(amenity.amenity_id)} onChange={() => setSelectedAmenities((current) => current.includes(amenity.amenity_id) ? current.filter((id) => id !== amenity.amenity_id) : [...current, amenity.amenity_id])} /><span>{amenity.name}</span></label>)}</div> : <p>No amenities are available for this hotel.</p>}</div>}
                     <div className="admin-crud-form-actions"><button type="button" className="admin-crud-cancel" disabled={savingRecord} onClick={closeModal}>Cancel</button><button type="submit" className="admin-crud-add" disabled={savingRecord || supportsAmenities && (availableAmenitiesLoading || linkedAmenitiesLoading)}>{savingRecord ? "Saving…" : supportsAmenities && (availableAmenitiesLoading || linkedAmenitiesLoading) ? "Loading amenities…" : modal.mode === "create" ? `Add ${definition.singular}` : "Save Changes"}</button></div>
                 </form>}

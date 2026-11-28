@@ -7,6 +7,9 @@ export type InventoryFieldDefinition = {
     type: FieldType;
     required?: boolean;
     min?: number;
+    max?: number;
+    integerOnly?: boolean;
+    defaultValue?: string;
     options?: string[];
 };
 export type InventoryRecord = Record<string, unknown>;
@@ -57,6 +60,35 @@ type InventoryResourceConfig = Omit<InventoryResourceKind,
 
 const asText = (value: unknown) => value === null || value === undefined ? "" : String(value);
 
+export const initialInventoryFormValues = (definition: InventoryResourceKind, mode: InventoryModalMode, record?: InventoryRecord) =>
+    Object.fromEntries(definition.fields.map((field) => [field.key, mode === "create"
+        ? field.key === "status" ? definition.defaultStatus : field.defaultValue ?? ""
+        : asText(record?.[field.key])]));
+
+export const validateInventoryValues = (fields: readonly InventoryFieldDefinition[], values: Record<string, string>) => {
+    for (const field of fields) {
+        const value = (values[field.key] ?? "").trim();
+        if (field.required && !value) return `Please complete the required field: ${field.label}.`;
+        if (field.type !== "number" || !value) continue;
+        const number = Number(value);
+        if (!Number.isFinite(number)) return `${field.label} must be a number.`;
+        if (field.min !== undefined && number < field.min) {
+            return field.key === "grace_period_minutes" ? `Grace period must be between ${field.min} and ${field.max} minutes.` : `${field.label} must be at least ${field.min}.`;
+        }
+        if (field.max !== undefined && number > field.max) {
+            return field.key === "grace_period_minutes" ? `Grace period must be between ${field.min ?? 0} and ${field.max} minutes.` : `${field.label} must be at most ${field.max}.`;
+        }
+        if (field.integerOnly && !Number.isInteger(number)) return `${field.label} must be a whole number.`;
+    }
+    return null;
+};
+
+export const inventoryPayload = (fields: readonly InventoryFieldDefinition[], values: Record<string, string>) =>
+    Object.fromEntries(fields.flatMap((field) => {
+        const value = (values[field.key] ?? "").trim();
+        return value ? [[field.key, field.type === "number" ? Number(value) : value]] : [];
+    }));
+
 export const createInventoryResourceKind = (config: InventoryResourceConfig): InventoryResourceKind => {
     const amenities = config.amenities;
     return {
@@ -71,7 +103,7 @@ export const createInventoryResourceKind = (config: InventoryResourceConfig): In
         initialAmenitiesLoaded: amenities?.initiallyLoaded ?? false,
         getAmenityHotelId(mode, formValues, record) {
             if (!amenities) return "";
-            return mode === "create" ? asText(formValues[amenities.parentField]) : asText(record?.[amenities.parentField]);
+            return asText(formValues[amenities.parentField] ?? record?.[amenities.parentField]);
         },
         getAmenitiesPath(record) {
             return `${config.endpoint}/${record[config.idField]}/amenities`;
@@ -120,7 +152,8 @@ export const roomInventoryKind = createInventoryResourceKind({
         { key: "hotel_id", label: "Hotel ID", type: "number", required: true, min: 1 },
         { key: "room_number", label: "Room Number", type: "text", required: true },
         { key: "room_type", label: "Room Type", type: "select", required: true, options: ["Standard Room", "Deluxe Room", "Family Room", "Suite"] },
-        { key: "capacity", label: "Capacity", type: "number", required: true, min: 1 },
+        { key: "capacity", label: "No. of pax", type: "number", required: true, min: 1 },
+        { key: "grace_period_minutes", label: "Grace period (minutes)", type: "number", required: true, min: 0, max: 1440, integerOnly: true, defaultValue: "30" },
         { key: "price_per_night", label: "Price per Night (₱)", type: "number", required: true, min: 0 },
         { key: "status", label: "Room Status", type: "select", required: true, options: [...statusOptionsFor("rooms")] },
     ],
@@ -129,10 +162,12 @@ export const roomInventoryKind = createInventoryResourceKind({
 export const tableInventoryKind = createInventoryResourceKind({
     kind: "tables", label: "Tables", singular: "Table", description: "Manage restaurant tables, seating capacity, and availability.",
     endpoint: "/tables", idField: "table_id", statusField: "status", summaryStatus: "Available", mediaEntityType: "table",
+    amenities: { parentField: "restaurant_id", label: "Table Amenities", subject: "table", showOnCreate: true, showOnEdit: true, requireLoadedOnCreate: true, requireLoadedOnEdit: true, initiallyLoaded: false },
     fields: [
         { key: "restaurant_id", label: "Restaurant ID", type: "number", required: true, min: 1 },
         { key: "table_number", label: "Table Number", type: "text", required: true },
-        { key: "capacity", label: "Seating Capacity", type: "number", required: true, min: 1 },
+        { key: "capacity", label: "No. of pax", type: "number", required: true, min: 1 },
+        { key: "grace_period_minutes", label: "Grace period (minutes)", type: "number", required: true, min: 0, max: 30, integerOnly: true, defaultValue: "30" },
         { key: "status", label: "Table Status", type: "select", required: true, options: [...statusOptionsFor("tables")] },
     ],
 });

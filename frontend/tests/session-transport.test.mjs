@@ -38,6 +38,29 @@ test("API sends credentialed requests and adds CSRF only to state-changing API c
     assert.equal(new Headers(calls[1].init.headers).get("Authorization"), null);
 });
 
+test("table amenity client functions use the table endpoints and preserve CSRF for writes", async () => {
+    api.setCsrfToken("table-amenity-csrf");
+    const originalFetch = globalThis.fetch;
+    const calls = [];
+    globalThis.fetch = async (url, init = {}) => {
+        calls.push({ url: String(url), init });
+        return jsonResponse(calls.length === 1 ? [{ amenity_id: 4, name: "Wi-Fi" }] : { table_id: 7, amenity_id: 4 });
+    };
+    try {
+        await api.getTableAmenities(7);
+        await api.linkTableAmenity(7, 4);
+        await api.unlinkTableAmenity(7, 4);
+    } finally { globalThis.fetch = originalFetch; api.clearCsrfToken(); }
+    assert.deepEqual(calls.map((call) => [call.url, call.init.method ?? "GET"]), [
+        ["/api/tables/7/amenities", "GET"],
+        ["/api/tables/7/amenities", "POST"],
+        ["/api/tables/7/amenities/4", "DELETE"],
+    ]);
+    assert.deepEqual(JSON.parse(calls[1].init.body), { amenity_id: 4 });
+    assert.equal(new Headers(calls[1].init.headers).get("X-CSRF-Token"), "table-amenity-csrf");
+    assert.equal(new Headers(calls[2].init.headers).get("X-CSRF-Token"), "table-amenity-csrf");
+});
+
 test("API refreshes the CSRF token once after the backend rejects an expired token", async () => {
     api.clearCsrfToken();
     const originalFetch = globalThis.fetch;

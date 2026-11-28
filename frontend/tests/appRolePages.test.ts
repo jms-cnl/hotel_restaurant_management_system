@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { isValidElement } from "react";
@@ -54,4 +55,10 @@ test("Landing redirect follows each role's existing landing destination", () => 
         assert.equal(redirect.props.to, destination);
         assert.equal(redirect.props.replace, true);
     }
+});
+
+test("Staff inventory routes stay on the read-only ResourcePage while Admin gets edit controls", async () => {
+    const app = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
+    assert.match(app, /function ManagerInventoryRoute[\s\S]*?return isAdmin\(user\) \? <AdminInventoryPage kind=\{kind\} \/> : <ResourcePage kind=\{kind\} \/>/);
+    assert.match(app, /function ResourcePage[\s\S]*?\{manager && <form className="form-panel inline-form"/);
 });
