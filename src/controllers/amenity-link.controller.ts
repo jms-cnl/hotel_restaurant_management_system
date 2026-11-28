@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { addResourceAmenity, AmenityLinkError, deleteResourceAmenity, getResourceAmenities } from "../services/amenity-link.service.js";
 
-type Resource = "room" | "restaurant";
+type Resource = "room" | "restaurant" | "table";
 
 const sendError = (res: Response, error: unknown, fallback: string) => {
     console.error(error);
@@ -12,7 +12,8 @@ const sendError = (res: Response, error: unknown, fallback: string) => {
     res.status(500).json({ message: fallback });
 };
 
-const resourceId = (req: Request, resource: Resource) => req.params[resource === "room" ? "roomId" : "restaurantId"];
+const resourceId = (req: Request, resource: Resource) =>
+    req.params[resource === "room" ? "roomId" : resource === "table" ? "tableId" : "restaurantId"];
 
 export const getRoomAmenitiesController = async (req: Request, res: Response) => {
     try { res.json(await getResourceAmenities(req, "room", resourceId(req, "room"))); }
@@ -46,4 +47,21 @@ export const deleteRestaurantAmenityController = async (req: Request, res: Respo
         await deleteResourceAmenity(req, "restaurant", resourceId(req, "restaurant"), req.params.amenityId);
         res.status(204).send();
     } catch (error) { sendError(res, error, "Failed to unlink amenity from restaurant"); }
+};
+
+export const getTableAmenitiesController = async (req: Request, res: Response) => {
+    try { res.json(await getResourceAmenities(req, "table", resourceId(req, "table"))); }
+    catch (error) { sendError(res, error, "Failed to retrieve table amenities"); }
+};
+
+export const addTableAmenityController = async (req: Request, res: Response) => {
+    try { res.status(201).json(await addResourceAmenity(req, "table", resourceId(req, "table"), req.body?.amenity_id)); }
+    catch (error) { sendError(res, error, "Failed to link amenity to table"); }
+};
+
+export const deleteTableAmenityController = async (req: Request, res: Response) => {
+    try {
+        await deleteResourceAmenity(req, "table", resourceId(req, "table"), req.params.amenityId);
+        res.status(204).send();
+    } catch (error) { sendError(res, error, "Failed to unlink amenity from table"); }
 };
