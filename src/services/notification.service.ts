@@ -1,6 +1,6 @@
 import type { Request } from "express";
-import { supabase } from "../config/supabase.js";
 import { getRequestSupabase } from "../config/supabase.js";
+import { InAppNotificationCreator } from "./notification-channel.js";
 
 export type ReservationNotificationType =
     | "RESERVATION_CREATED"
@@ -32,22 +32,7 @@ const notificationContent: Record<ReservationNotificationType, { title: string; 
 
 export const createReservationNotification = async ({ userId, reservationId, type }: ReservationNotificationEvent) => {
     const content = notificationContent[type];
-    try {
-        const { error } = await supabase.from("notification").insert({
-            user_id: userId,
-            reservation_id: reservationId,
-            title: content.title,
-            message: content.message,
-            type,
-            is_read: false
-        });
-
-        if (error) {
-            console.error("Reservation notification creation failed", { reservationId, type, errorCode: error.code });
-        }
-    } catch {
-        console.error("Reservation notification creation failed", { reservationId, type });
-    }
+    await new InAppNotificationCreator().deliver({ userId, reservationId, ...content, type });
 };
 
 export const getNotifications = async (req: Request) => {
