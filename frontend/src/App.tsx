@@ -425,7 +425,62 @@ function ResourcePage({ kind }: { kind: keyof typeof mediaEntityTypes }) {
     const submit = async (event: FormEvent) => { event.preventDefault(); setError(""); try { const payload: Record<string, unknown> = { ...form }; for (const field of ["hotel_id", "restaurant_id", "capacity", "price_per_night"]) if (payload[field] !== undefined && payload[field] !== "") payload[field] = Number(payload[field]); if (editing) await apiPut(`${config.endpoint}/${editing}`, payload); else await apiPost(config.endpoint, payload); setForm(emptyForm()); setEditing(null); load(); } catch (e) { setError(e instanceof Error ? e.message : "Save failed"); } };
     const remove = async (id: number) => { if (!confirm("Delete this record?")) return; try { await apiDelete(`${config.endpoint}/${id}`); load(); } catch (e) { setError(e instanceof Error ? e.message : "Delete failed"); } };
     const showAmenities = kind === "rooms" || kind === "tables";
-    return <Page title={config.title} error={error} loading={loading}><div className="toolbar">{config.search && <input placeholder="Search" value={filter} onChange={e => setFilter(e.target.value)} />}</div><div className="table-wrap"><table><thead><tr>{config.fields.map(field => <th key={field}>{staffInventoryFieldLabel(field)}</th>)}<th>Media</th>{showAmenities && <th>Amenities</th>}{manager && <th>Actions</th>}</tr></thead><tbody>{items.map(item => { const id = Number(item[config.id]); const amenityState = amenitiesById[id]; return <tr key={String(item[config.id])}>{config.fields.map(field => <td key={field}>{formatStaffInventoryValue(field, item[field])}</td>)}<td><button onClick={() => setMediaEntity(id)}>View images</button></td>{showAmenities && <td><button type="button" disabled={amenityState?.loading} onClick={() => void toggleAmenities(item)}>{amenityState?.loading ? "Loading amenities…" : amenityState ? "Hide amenities" : "View amenities"}</button>{amenityState && <InventoryAmenityDetails state={amenityState} />}</td>}{manager && <td><button onClick={() => { setEditing(id); setForm(Object.fromEntries(config.fields.map(field => [field, String(item[field] ?? "")])); }}>Edit</button> <button onClick={() => remove(id)}>Delete</button></td>}</tr>; })}</tbody></table>{!items.length && <p className="empty">No records found.</p>}</div>{mediaEntity !== null && <MediaManager entityType={mediaEntityTypes[kind]} entityId={mediaEntity} manager={manager} />}{manager && <form className="form-panel inline-form" onSubmit={submit}><h2>{editing ? `Edit ${config.title.slice(0, -1)}` : `Add ${config.title.slice(0, -1)}`}</h2>{config.fields.map(field => <label key={field}>{field}{field === "status" ? <select required value={form[field] ?? defaultStatusFor(kind as InventoryResourceKind)} onChange={e => setForm({ ...form, [field]: e.target.value })}>{statusOptionsFor(kind as InventoryResourceKind).map(option => <option value={option} key={option}>{option}</option>)}</select> : <input required={!field.includes("description") && field !== "email"} value={form[field] ?? ""} onChange={e => setForm({ ...form, [field]: e.target.value })} />}</label>)}<button type="submit">Save</button>{editing && <button type="button" onClick={() => { setEditing(null); setForm(emptyForm()); }}>Cancel</button>}</form>}</Page>;
+    return (
+        <Page title={config.title} error={error} loading={loading}>
+            <div className="toolbar">
+                {config.search && <input placeholder="Search" value={filter} onChange={e => setFilter(e.target.value)} />}
+            </div>
+            <div className="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            {config.fields.map(field => <th key={field}>{staffInventoryFieldLabel(field)}</th>)}
+                            <th>Media</th>
+                            {showAmenities && <th>Amenities</th>}
+                            {manager && <th>Actions</th>}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {items.map(item => {
+                            const id = Number(item[config.id]);
+                            const amenityState = amenitiesById[id];
+                            return (
+                                <tr key={String(item[config.id])}>
+                                    {config.fields.map(field => <td key={field}>{formatStaffInventoryValue(field, item[field])}</td>)}
+                                    <td><button onClick={() => setMediaEntity(id)}>View images</button></td>
+                                    {showAmenities && <td>
+                                        <button type="button" disabled={amenityState?.loading} onClick={() => void toggleAmenities(item)}>
+                                            {amenityState?.loading ? "Loading amenities…" : amenityState ? "Hide amenities" : "View amenities"}
+                                        </button>
+                                        {amenityState && <InventoryAmenityDetails state={amenityState} />}
+                                    </td>}
+                                    {manager && <td>
+                                        <button onClick={() => {
+                                            setEditing(id);
+                                            setForm(Object.fromEntries(config.fields.map(field => [field, String(item[field] ?? "")])));
+                                        }}>Edit</button>{" "}
+                                        <button onClick={() => remove(id)}>Delete</button>
+                                    </td>}
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+                {!items.length && <p className="empty">No records found.</p>}
+            </div>
+            {mediaEntity !== null && <MediaManager entityType={mediaEntityTypes[kind]} entityId={mediaEntity} manager={manager} />}
+            {manager && <form className="form-panel inline-form" onSubmit={submit}>
+                <h2>{editing ? `Edit ${config.title.slice(0, -1)}` : `Add ${config.title.slice(0, -1)}`}</h2>
+                {config.fields.map(field => <label key={field}>{field}{field === "status"
+                    ? <select required value={form[field] ?? defaultStatusFor(kind as InventoryResourceKind)} onChange={e => setForm({ ...form, [field]: e.target.value })}>
+                        {statusOptionsFor(kind as InventoryResourceKind).map(option => <option value={option} key={option}>{option}</option>)}
+                    </select>
+                    : <input required={!field.includes("description") && field !== "email"} value={form[field] ?? ""} onChange={e => setForm({ ...form, [field]: e.target.value })} />}</label>)}
+                <button type="submit">Save</button>
+                {editing && <button type="button" onClick={() => { setEditing(null); setForm(emptyForm()); }}>Cancel</button>}
+            </form>}
+        </Page>
+    );
 }
 
 function Reservations({ manageView = false }: { manageView?: boolean } = {}) {
