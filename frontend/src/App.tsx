@@ -32,6 +32,8 @@ import { CombinedStayWizard } from "./components/CombinedStayWizard";
 import { StaffLayout } from "./components/StaffLayout";
 import { Dashboard, Home, LandingRedirect } from "./components/AppRolePages";
 import { staffRedirectForPath } from "./staffNavigation";
+import { InventoryAmenityDetails } from "./components/InventoryAmenityDetails";
+import { formatStaffInventoryValue, loadStaffAmenities, staffInventoryFieldLabel, type StaffAmenityState } from "./staffInventory";
 
 function Protected({ children }: { children: ReactNode }) {
     const { user, loading } = useAuth();
@@ -396,8 +398,8 @@ type ResourceConfig = { title: string; endpoint: string; id: string; fields: str
 const resourceConfigs: Record<keyof typeof mediaEntityTypes, ResourceConfig> = {
     hotels: { title: "Hotels", endpoint: "/hotels", id: "hotel_id", fields: ["name", "address", "description", "contact_number", "email", "status"], search: "search" },
     restaurants: { title: "Restaurants", endpoint: "/restaurants", id: "restaurant_id", fields: ["name", "address", "description", "contact_number", "email", "status"], search: "search" },
-    rooms: { title: "Rooms", endpoint: "/rooms", id: "room_id", fields: ["hotel_id", "room_number", "room_type", "capacity", "price_per_night", "status"] },
-    tables: { title: "Tables", endpoint: "/tables", id: "table_id", fields: ["restaurant_id", "table_number", "capacity", "status"] }
+    rooms: { title: "Rooms", endpoint: "/rooms", id: "room_id", fields: ["hotel_id", "room_number", "room_type", "capacity", "grace_period_minutes", "price_per_night", "status"] },
+    tables: { title: "Tables", endpoint: "/tables", id: "table_id", fields: ["restaurant_id", "table_number", "capacity", "grace_period_minutes", "status"] }
 };
 
 const mediaEntityTypes = { hotels: "hotel", restaurants: "restaurant", rooms: "room", tables: "table" } as const;
@@ -406,11 +408,24 @@ function ResourcePage({ kind }: { kind: keyof typeof mediaEntityTypes }) {
     const config = resourceConfigs[kind]; const { user } = useAuth(); const manager = isAdmin(user); const [mediaEntity, setMediaEntity] = useState<number | null>(null);
     const emptyForm = () => ({ status: defaultStatusFor(kind as InventoryResourceKind) });
     const [items, setItems] = useState<Record<string, unknown>[]>([]); const [form, setForm] = useState<Record<string, string>>(emptyForm); const [editing, setEditing] = useState<number | null>(null); const [filter, setFilter] = useState(""); const [error, setError] = useState(""); const [loading, setLoading] = useState(true);
+    const [amenitiesById, setAmenitiesById] = useState<Record<number, StaffAmenityState>>({});
     const load = () => { setLoading(true); const query = config.search && filter ? `?${config.search}=${encodeURIComponent(filter)}` : ""; apiGet<Record<string, unknown>[]>(`${config.endpoint}${query}`).then(setItems).catch(e => setError(e.message)).finally(() => setLoading(false)); };
     useEffect(load, [filter]);
+    const amenityResource = kind === "tables" ? "tables" : "rooms";
+    const toggleAmenities = async (item: Record<string, unknown>) => {
+        const id = Number(item[config.id]);
+        if (amenitiesById[id]) {
+            setAmenitiesById((current) => { const next = { ...current }; delete next[id]; return next; });
+            return;
+        }
+        setAmenitiesById((current) => ({ ...current, [id]: { loading: true, amenities: [], error: "" } }));
+        const state = await loadStaffAmenities(amenityResource, id);
+        setAmenitiesById((current) => ({ ...current, [id]: state }));
+    };
     const submit = async (event: FormEvent) => { event.preventDefault(); setError(""); try { const payload: Record<string, unknown> = { ...form }; for (const field of ["hotel_id", "restaurant_id", "capacity", "price_per_night"]) if (payload[field] !== undefined && payload[field] !== "") payload[field] = Number(payload[field]); if (editing) await apiPut(`${config.endpoint}/${editing}`, payload); else await apiPost(config.endpoint, payload); setForm(emptyForm()); setEditing(null); load(); } catch (e) { setError(e instanceof Error ? e.message : "Save failed"); } };
     const remove = async (id: number) => { if (!confirm("Delete this record?")) return; try { await apiDelete(`${config.endpoint}/${id}`); load(); } catch (e) { setError(e instanceof Error ? e.message : "Delete failed"); } };
-    return <Page title={config.title} error={error} loading={loading}><div className="toolbar">{config.search && <input placeholder="Search" value={filter} onChange={e => setFilter(e.target.value)} />}</div><div className="table-wrap"><table><thead><tr>{config.fields.map(field => <th key={field}>{field}</th>)}<th>Media</th>{manager && <th>Actions</th>}</tr></thead><tbody>{items.map(item => <tr key={String(item[config.id])}>{config.fields.map(field => <td key={field}>{String(item[field] ?? "")}</td>)}<td><button onClick={() => setMediaEntity(Number(item[config.id]))}>View images</button></td>{manager && <td><button onClick={() => { setEditing(Number(item[config.id])); setForm(Object.fromEntries(config.fields.map(field => [field, String(item[field] ?? "")]))); }}>Edit</button> <button onClick={() => remove(Number(item[config.id]))}>Delete</button></td>}</tr>)}</tbody></table>{!items.length && <p className="empty">No records found.</p>}</div>{mediaEntity !== null && <MediaManager entityType={mediaEntityTypes[kind]} entityId={mediaEntity} manager={manager} />}{manager && <form className="form-panel inline-form" onSubmit={submit}><h2>{editing ? `Edit ${config.title.slice(0, -1)}` : `Add ${config.title.slice(0, -1)}`}</h2>{config.fields.map(field => <label key={field}>{field}{field === "status" ? <select required value={form[field] ?? defaultStatusFor(kind as InventoryResourceKind)} onChange={e => setForm({ ...form, [field]: e.target.value })}>{statusOptionsFor(kind as InventoryResourceKind).map(option => <option value={option} key={option}>{option}</option>)}</select> : <input required={!field.includes("description") && field !== "email"} value={form[field] ?? ""} onChange={e => setForm({ ...form, [field]: e.target.value })} />}</label>)}<button type="submit">Save</button>{editing && <button type="button" onClick={() => { setEditing(null); setForm(emptyForm()); }}>Cancel</button>}</form>}</Page>;
+    const showAmenities = kind === "rooms" || kind === "tables";
+    return <Page title={config.title} error={error} loading={loading}><div className="toolbar">{config.search && <input placeholder="Search" value={filter} onChange={e => setFilter(e.target.value)} />}</div><div className="table-wrap"><table><thead><tr>{config.fields.map(field => <th key={field}>{staffInventoryFieldLabel(field)}</th>)}<th>Media</th>{showAmenities && <th>Amenities</th>}{manager && <th>Actions</th>}</tr></thead><tbody>{items.map(item => { const id = Number(item[config.id]); const amenityState = amenitiesById[id]; return <tr key={String(item[config.id])}>{config.fields.map(field => <td key={field}>{formatStaffInventoryValue(field, item[field])}</td>)}<td><button onClick={() => setMediaEntity(id)}>View images</button></td>{showAmenities && <td><button type="button" disabled={amenityState?.loading} onClick={() => void toggleAmenities(item)}>{amenityState?.loading ? "Loading amenities…" : amenityState ? "Hide amenities" : "View amenities"}</button>{amenityState && <InventoryAmenityDetails state={amenityState} />}</td>}{manager && <td><button onClick={() => { setEditing(id); setForm(Object.fromEntries(config.fields.map(field => [field, String(item[field] ?? "")])); }}>Edit</button> <button onClick={() => remove(id)}>Delete</button></td>}</tr>; })}</tbody></table>{!items.length && <p className="empty">No records found.</p>}</div>{mediaEntity !== null && <MediaManager entityType={mediaEntityTypes[kind]} entityId={mediaEntity} manager={manager} />}{manager && <form className="form-panel inline-form" onSubmit={submit}><h2>{editing ? `Edit ${config.title.slice(0, -1)}` : `Add ${config.title.slice(0, -1)}`}</h2>{config.fields.map(field => <label key={field}>{field}{field === "status" ? <select required value={form[field] ?? defaultStatusFor(kind as InventoryResourceKind)} onChange={e => setForm({ ...form, [field]: e.target.value })}>{statusOptionsFor(kind as InventoryResourceKind).map(option => <option value={option} key={option}>{option}</option>)}</select> : <input required={!field.includes("description") && field !== "email"} value={form[field] ?? ""} onChange={e => setForm({ ...form, [field]: e.target.value })} />}</label>)}<button type="submit">Save</button>{editing && <button type="button" onClick={() => { setEditing(null); setForm(emptyForm()); }}>Cancel</button>}</form>}</Page>;
 }
 
 function Reservations({ manageView = false }: { manageView?: boolean } = {}) {
