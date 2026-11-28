@@ -1,4 +1,11 @@
 import { supabase } from "../config/supabase.js";
+import { createEmailSender, type EmailMessage, type EmailSender } from "./email-sender.js";
+import {
+    combinedBookingConfirmedTemplate,
+    reservationCreatedTemplate,
+    reservationStatusChangedTemplate,
+    supportMessageResolvedTemplate,
+} from "./email-templates.js";
 
 export type NotificationMessage = {
     userId: string;
@@ -8,19 +15,21 @@ export type NotificationMessage = {
     type: string;
 };
 
-export interface NotificationChannel {
-    deliver(notification: NotificationMessage): Promise<void>;
+export type NotificationChannelResult = { providerMessageId?: string } | void;
+
+export interface NotificationChannel<TNotification = NotificationMessage> {
+    deliver(notification: TNotification): Promise<NotificationChannelResult>;
 }
 
-export abstract class NotificationChannelCreator {
-    abstract createChannel(): NotificationChannel;
+export abstract class NotificationChannelCreator<TNotification = NotificationMessage> {
+    abstract createChannel(): NotificationChannel<TNotification>;
 
-    deliver(notification: NotificationMessage): Promise<void> {
+    deliver(notification: TNotification): Promise<NotificationChannelResult> {
         return this.createChannel().deliver(notification);
     }
 }
 
-export class InAppNotificationChannel implements NotificationChannel {
+export class InAppNotificationChannel implements NotificationChannel<NotificationMessage> {
     constructor(
         private readonly insert: (notification: NotificationMessage) => Promise<{ error: { code?: string } | null }> = async (notification) => {
             const { userId, reservationId, title, message, type } = notification;
@@ -49,8 +58,48 @@ export class InAppNotificationChannel implements NotificationChannel {
     }
 }
 
-export class InAppNotificationCreator extends NotificationChannelCreator {
-    createChannel(): NotificationChannel {
+export class InAppNotificationCreator extends NotificationChannelCreator<NotificationMessage> {
+    createChannel(): NotificationChannel<NotificationMessage> {
         return new InAppNotificationChannel();
+    }
+}
+
+export type EmailNotification =
+    | { type: "RESERVATION_CREATED"; to: string; bookingId: string | number }
+    | { type: "RESERVATION_STATUS_CHANGED"; to: string; bookingId: string | number; status: "confirmed" | "cancelled" }
+    | { type: "COMBINED_BOOKING_CONFIRMED"; to: string; bookingId: string | number }
+    | { type: "SUPPORT_MESSAGE_RESOLVED"; to: string; supportMessageId: string | number };
+
+export class EmailNotificationChannel implements NotificationChannel<EmailNotification> {
+    constructor(private readonly sender: EmailSender) {}
+
+    async deliver(notification: EmailNotification): Promise<NotificationChannelResult> {
+        let template: Omit<EmailMessage, "to">;
+        switch (notification.type) {
+            case "RESERVATION_CREATED":
+                template = reservationCreatedTemplate({ bookingId: notification.bookingId });
+                break;
+            case "RESERVATION_STATUS_CHANGED":
+                template = reservationStatusChangedTemplate({ bookingId: notification.bookingId, status: notification.status });
+                break;
+            case "COMBINED_BOOKING_CONFIRMED":
+                template = combinedBookingConfirmedTemplate({ bookingId: notification.bookingId });
+                break;
+            case "SUPPORT_MESSAGE_RESOLVED":
+                template = supportMessageResolvedTemplate({ supportMessageId: notification.supportMessageId });
+                break;
+        }
+
+        return this.sender.send({ to: notification.to, ...template });
+    }
+}
+
+export class EmailNotificationCreator extends NotificationChannelCreator<EmailNotification> {
+    constructor(private readonly sender: EmailSender = createEmailSender()) {
+        super();
+    }
+
+    createChannel(): NotificationChannel<EmailNotification> {
+        return new EmailNotificationChannel(this.sender);
     }
 }
