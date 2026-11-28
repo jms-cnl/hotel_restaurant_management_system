@@ -1,5 +1,6 @@
 import type { Request } from "express";
 import { getRequestSupabase } from "../config/supabase.js";
+import { assertRestaurantAccess, RestaurantAccessError } from "../middleware/restaurant-access.middleware.js";
 
 export class AmenityLinkError extends Error {
     constructor(message: string, public readonly statusCode = 400) {
@@ -8,10 +9,11 @@ export class AmenityLinkError extends Error {
     }
 }
 
-type Resource = "room" | "restaurant";
+type Resource = "room" | "restaurant" | "table";
 const resourceFields = {
     room: { id: "room_id", linkTable: "room_amenity", linkId: "room_id", invalid: "Invalid room id", missing: "Room not found" },
     restaurant: { id: "restaurant_id", linkTable: "restaurant_amenity", linkId: "restaurant_id", invalid: "Invalid restaurant id", missing: "Restaurant not found" },
+    table: { id: "table_id", linkTable: "table_amenity", linkId: "table_id", invalid: "Invalid table id", missing: "Table not found" },
 } as const;
 
 const parseId = (value: unknown, invalidMessage: string): number => {
@@ -24,6 +26,18 @@ const parseId = (value: unknown, invalidMessage: string): number => {
 
 const getResource = async (req: Request, resource: Resource, resourceId: number) => {
     const fields = resourceFields[resource];
+    if (resource === "table") {
+        const { data, error } = await getRequestSupabase(req)
+            .from("restaurant_table")
+            .select("table_id, restaurant_id, restaurant(hotel_id)")
+            .eq("table_id", resourceId)
+            .maybeSingle();
+        if (error) throw error;
+        if (!data) throw new AmenityLinkError(fields.missing, 404);
+        const restaurant = Array.isArray(data.restaurant) ? data.restaurant[0] : data.restaurant;
+        if (!restaurant) throw new AmenityLinkError("Table restaurant not found", 404);
+        return { ...data, hotel_id: restaurant.hotel_id };
+    }
     const { data, error } = await getRequestSupabase(req)
         .from(resource)
         .select(`${fields.id}, hotel_id`)
@@ -32,6 +46,15 @@ const getResource = async (req: Request, resource: Resource, resourceId: number)
     if (error) throw error;
     if (!data) throw new AmenityLinkError(fields.missing, 404);
     return data;
+};
+
+const verifyTableStaffAccess = async (req: Request, parent: { restaurant_id: number }) => {
+    try {
+        await assertRestaurantAccess(req, Number(parent.restaurant_id));
+    } catch (error) {
+        if (error instanceof RestaurantAccessError) throw new AmenityLinkError(error.message, error.statusCode);
+        throw error;
+    }
 };
 
 const getAmenity = async (req: Request, amenityId: number) => {
@@ -48,7 +71,10 @@ const getAmenity = async (req: Request, amenityId: number) => {
 export const getResourceAmenities = async (req: Request, resource: Resource, resourceIdValue: unknown) => {
     const fields = resourceFields[resource];
     const resourceId = parseId(resourceIdValue, fields.invalid);
-    await getResource(req, resource, resourceId);
+    const parent = await getResource(req, resource, resourceId);
+    if (resource === "table" && req.auth?.roleName.toLowerCase() === "staff") {
+        await verifyTableStaffAccess(req, parent as { restaurant_id: number });
+    }
     const { data: links, error: linkError } = await getRequestSupabase(req)
         .from(fields.linkTable)
         .select("amenity_id")
