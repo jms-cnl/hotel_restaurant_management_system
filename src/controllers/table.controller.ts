@@ -7,6 +7,9 @@ import {  getTables,
     deleteTable,
     TableError} from "../services/table.service.js";
 
+const isPermissionError = (error: unknown) =>
+    Boolean(error && typeof error === "object" && "code" in error && error.code === "42501");
+
 export const getTablesController = async (req: Request, res: Response) => {
     try {
         const tables = await getTables({
@@ -50,6 +53,16 @@ export const createTableController = async (req: Request, res: Response) => {
             return;
         }
 
+        if (error instanceof TableError) {
+            res.status(error.statusCode).json({ message: error.message });
+            return;
+        }
+
+        if (isPermissionError(error)) {
+            res.status(403).json({ message: "Insufficient permissions" });
+            return;
+        }
+
         res.status(500).json({
             message: "Failed to create table"
         });
@@ -71,6 +84,11 @@ export const updateTableController = async (req: Request, res: Response) => {
 
         if (error instanceof TableError) {
             res.status(error.statusCode).json({ message: error.message });
+            return;
+        }
+
+        if (isPermissionError(error)) {
+            res.status(403).json({ message: "Insufficient permissions" });
             return;
         }
 

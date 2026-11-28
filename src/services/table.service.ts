@@ -9,6 +9,14 @@ export class TableError extends Error {
     }
 }
 
+const validateGracePeriod = (value: unknown) => {
+    if (value === undefined) return undefined;
+    if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 30) {
+        throw new TableError("grace_period_minutes must be an integer between 0 and 30");
+    }
+    return value;
+};
+
 export const getTables = async (filters: { status?: string | undefined }) => {
     let query = supabase
         .from("restaurant_table")
@@ -45,10 +53,14 @@ export const createTable = async (table: {
     restaurant_id: number;
     table_number: string;
     capacity: number;
+    grace_period_minutes?: number;
     status?: unknown;
 }) => {
+    const gracePeriod = validateGracePeriod(table.grace_period_minutes);
+    const { grace_period_minutes: _gracePeriodMinutes, ...tableFields } = table;
     const normalizedTable = {
-        ...table,
+        ...tableFields,
+        ...(gracePeriod === undefined ? {} : { grace_period_minutes: gracePeriod }),
         status: canonicalizeStatus(table.status, "restaurant table", TABLE_STATUSES, "Available")
     };
     const { data, error } = await supabase
@@ -70,11 +82,15 @@ export const updateTable = async (
         restaurant_id?: number;
         table_number?: string;
         capacity?: number;
+        grace_period_minutes?: number;
         status?: unknown;
     }
 ) => {
-    const validFields = new Set(["restaurant_id", "table_number", "capacity", "status"]);
-    const updateFields = Object.fromEntries(Object.entries(table).filter(([field]) => validFields.has(field)));
+    const gracePeriod = validateGracePeriod(table.grace_period_minutes);
+    const validFields = new Set(["restaurant_id", "table_number", "capacity", "grace_period_minutes", "status"]);
+    const updateFields = Object.fromEntries(Object.entries(table).filter(([field, value]) =>
+        validFields.has(field) && !(field === "grace_period_minutes" && value === undefined)));
+    if (gracePeriod !== undefined) updateFields.grace_period_minutes = gracePeriod;
     if (Object.hasOwn(updateFields, "status")) {
         if (updateFields.status === undefined) delete updateFields.status;
         else updateFields.status = canonicalizeStatus(updateFields.status, "restaurant table", TABLE_STATUSES, "Available");

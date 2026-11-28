@@ -9,6 +9,9 @@ import {
     RoomError
 } from "../services/room.service.js";
 
+const isPermissionError = (error: unknown) =>
+    Boolean(error && typeof error === "object" && "code" in error && error.code === "42501");
+
 export const getRoomsController = async (req: Request, res: Response) => {
     try {
         const rooms = await getRooms({
@@ -54,6 +57,16 @@ export const createRoomController = async (req: Request, res: Response) => {
             return;
         }
 
+        if (error instanceof RoomError) {
+            res.status(error.statusCode).json({ message: error.message });
+            return;
+        }
+
+        if (isPermissionError(error)) {
+            res.status(403).json({ message: "Insufficient permissions" });
+            return;
+        }
+
         res.status(500).json({
             message: "Failed to create room",
             error: error
@@ -76,6 +89,11 @@ export const updateRoomController = async (req: Request, res: Response) => {
 
         if (error instanceof RoomError) {
             res.status(error.statusCode).json({ message: error.message });
+            return;
+        }
+
+        if (isPermissionError(error)) {
+            res.status(403).json({ message: "Insufficient permissions" });
             return;
         }
 
